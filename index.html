@@ -407,6 +407,7 @@
     }
 
     // Sincronización bidireccional (Subir pendientes y descargar lo de todos los brigadistas)
+    // Sincronización bidireccional (Subir cola local y descargar lo de todos los brigadistas)
     async function attemptSync() {
       if (!navigator.onLine) {
         updateSyncUI(`📡 Modo Offline: ${syncQueue.length} pendiente(s). Datos locales protegidos.`);
@@ -430,24 +431,23 @@
         }
       }
 
-      // 2. Descargar todos los puntos registrados por todos los brigadistas desde Google Sheets
-      updateSyncUI('⏳ Actualizando mapa de brigadas en vivo...');
-      try {
-        const resp = await fetch(GOOGLE_SHEETS_URL);
-        const cloudData = await resp.json();
-        
+      // 2. Descargar registros de Google Sheets
+      updateSyncUI('⏳ Descargando registros de todos los dispositivos...');
+      
+      // Función para procesar los datos recibidos de la nube
+      window.handleCloudData = function(cloudData) {
         if (Array.isArray(cloudData) && cloudData.length > 0) {
-          // Unir evitando duplicados
-          const mapKey = c => `${c.nombre}_${Number(c.lat).toFixed(4)}_${Number(c.lng).toFixed(4)}`;
+          const mapKey = c => `${(c.nombre || '').trim().toLowerCase()}_${Number(c.lat).toFixed(3)}_${Number(c.lng).toFixed(3)}`;
           const existingKeys = new Set(communities.map(mapKey));
-          
+          let nuevos = 0;
+
           cloudData.forEach(item => {
             const key = mapKey(item);
             if (!existingKeys.has(key)) {
               communities.push(item);
               existingKeys.add(key);
+              nuevos++;
             } else {
-              // Actualizar estado si cambió en la hoja
               const idx = communities.findIndex(c => mapKey(c) === key);
               if (idx !== -1 && item.estado) {
                 communities[idx].estado = item.estado;
@@ -457,11 +457,31 @@
 
           localStorage.setItem('rotary_communities', JSON.stringify(communities));
           render();
+          updateSyncUI(`🟢 Sincronizado: ${cloudData.length} lugares cargados (${nuevos} nuevos).`);
+        } else {
+          updateSyncUI('🟢 Hoja conectada (sin filas nuevas aún).');
         }
-        updateSyncUI('🟢 Todo sincronizado y actualizado con la nube.');
-      } catch (e) {
-        // Si no devuelve GET aún, mantener status
-        updateSyncUI(syncQueue.length === 0 ? '🟢 Sincronizado con Google Drive.' : `🟡 ${syncQueue.length} pendiente(s).`);
+      };
+
+      // Intentar primero con fetch directo
+      try {
+        const resp = await fetch(GOOGLE_SHEETS_URL + '?t=' + Date.now());
+        const data = await resp.json();
+        window.handleCloudData(data);
+      } catch (fetchErr) {
+        // Si el navegador móvil bloquea CORS en el redirect de Google, usamos JSONP (100% infalible)
+        console.log("Fetch bloqueado por CORS, intentando vía JSONP...", fetchErr);
+        const scriptId = 'gas_jsonp_loader';
+        const oldScript = document.getElementById(scriptId);
+        if (oldScript) oldScript.remove();
+
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = GOOGLE_SHEETS_URL + '?callback=handleCloudData&t=' + Date.now();
+        script.onerror = function() {
+          updateSyncUI(syncQueue.length === 0 ? '🟢 Listo (Revisa que hayas publicado la Nueva Versión en Google Script).' : `🟡 ${syncQueue.length} pendiente(s).`);
+        };
+        document.body.appendChild(script);
       }
     }
 
