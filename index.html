@@ -32,11 +32,27 @@
     .btn-primary:hover { background-color: var(--primary-hover); }
     .btn-gps { background-color: #0284c7; color: white; width: 100%; margin-bottom: 8px; }
     .btn-gps:hover { background-color: #0369a1; }
+    .btn-sync { background-color: #059669; color: white; }
+    .btn-sync:hover { background-color: #047857; }
     .btn-danger { background-color: var(--danger); color: white; }
     .btn-success { background-color: var(--success); color: white; }
     .btn-sm { padding: 5px 9px; font-size: 0.75rem; }
 
-    .main-layout { display: grid; grid-template-columns: 390px 1fr; flex: 1; height: calc(100vh - 65px); }
+    .sync-banner {
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      padding: 6px 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #1e40af;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .main-layout { display: grid; grid-template-columns: 390px 1fr; flex: 1; height: calc(100vh - 100px); }
     @media (max-width: 900px) {
       .main-layout { grid-template-columns: 1fr; height: auto; }
       #map { height: 400px !important; }
@@ -72,6 +88,7 @@
     .badge-danger { background: #fee2e2; color: #b91c1c; }
     .badge-success { background: #dcfce7; color: #15803d; }
     .badge-gray { background: #f3f4f6; color: #4b5563; }
+    .badge-sync { background: #fef3c7; color: #b45309; }
 
     #map { width: 100%; height: 100%; min-height: 400px; }
     
@@ -86,12 +103,19 @@
   <header>
     <h1>Brigada Rotary - Logística Humanitaria</h1>
     <div class="header-actions">
-      <button class="btn btn-sm" onclick="exportDataJSON()">📥 Exportar JSON</button>
-      <button class="btn btn-sm" onclick="exportDataCSV()">📊 Exportar CSV</button>
+      <button class="btn btn-sm btn-sync" onclick="attemptSync()">🔄 Sincronizar Ahora</button>
+      <button class="btn btn-sm" onclick="exportDataJSON()">📥 JSON</button>
+      <button class="btn btn-sm" onclick="exportDataCSV()">📊 CSV</button>
       <input type="file" id="fileInput" accept=".json" style="display:none" onchange="importDataJSON(event)">
       <button class="btn btn-sm" onclick="document.getElementById('fileInput').click()">📤 Importar</button>
     </div>
   </header>
+
+  <!-- Banner de estado de conexión y sincronización con Google Drive -->
+  <div class="sync-banner">
+    <span id="syncText">🟢 Conectado con Google Drive. Listo para sincronizar.</span>
+    <span id="queueBadge" style="background: #2563eb; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">Cola: 0 pendientes</span>
+  </div>
 
   <div class="main-layout">
     <!-- Panel Lateral -->
@@ -107,16 +131,22 @@
       <form id="communityForm" onsubmit="saveCommunity(event)">
         <h2 style="font-size: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 10px;">Registrar Comunidad</h2>
         
-        <div class="form-group">
-          <label>Nombre de la Comunidad / Caserío *</label>
-          <input type="text" id="nombre" required placeholder="Ej: Caserío La Esperanza">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Nombre del Brigadista</label>
+            <input type="text" id="brigadista" placeholder="Tu nombre">
+          </div>
+          <div class="form-group">
+            <label>Comunidad / Caserío *</label>
+            <input type="text" id="nombre" required placeholder="Ej: La Colorada">
+          </div>
         </div>
 
         <div class="grid-2">
           <div class="form-group">
             <label>Estado *</label>
             <select id="estado">
-              <option value="Pendiente">🔴 Pendiente / Ocupa donación</option>
+              <option value="Pendiente">🔴 Pendiente / Ocupa ayuda</option>
               <option value="Atendido">🟢 Atendido / Cubierto</option>
               <option value="No Viable">⚪ No viable / Inaccesible</option>
             </select>
@@ -163,9 +193,9 @@
         <!-- Salud y Mascotas -->
         <label>Salud y Mascotas</label>
         <div class="grid-3">
-          <div class="form-group"><label>Niños Enfermos</label><input type="number" id="ninosEnfermos" value="0" min="0"></div>
-          <div class="form-group"><label>Adultos Enfermos</label><input type="number" id="adultosEnfermos" value="0" min="0"></div>
-          <div class="form-group"><label>Mayores Enfermos</label><input type="number" id="mayoresEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Niños Enf.</label><input type="number" id="ninosEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Adultos Enf.</label><input type="number" id="adultosEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Mayores Enf.</label><input type="number" id="mayoresEnfermos" value="0" min="0"></div>
           <div class="form-group"><label>Perros</label><input type="number" id="perros" value="0" min="0"></div>
           <div class="form-group"><label>Gatos</label><input type="number" id="gatos" value="0" min="0"></div>
         </div>
@@ -198,19 +228,17 @@
   </div>
 
   <script>
-    // ==========================================
-    // MOTOR PLUS CODE (STANDALONE 100% OFFLINE)
-    // ==========================================
+    // URL OFICIAL DE TU GOOGLE APPS SCRIPT
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwAvo80qVqNji42UyAlg6giPG-nPIx656v7mUxuDUK7cIbHdzMI3gtQm2IR1tUhaa_f/exec";
+
+    // MOTOR PLUS CODE OFFLINE
     const OLC = {
       ALPHABET: "23456789CFGHJMPQRVWX",
       RESOLUTIONS: [20.0, 1.0, 0.05, 0.0025, 0.000125],
-      
       encode: function(lat, lng) {
         lat = Math.min(Math.max(lat, -90.0), 90.0);
         lng = ((lng + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
-        let latVal = lat + 90.0;
-        let lngVal = lng + 180.0;
-        let code = "";
+        let latVal = lat + 90.0, lngVal = lng + 180.0, code = "";
         for (let i = 0; i < 5; i++) {
           let res = this.RESOLUTIONS[i];
           let latDigit = Math.floor(latVal / res);
@@ -222,12 +250,9 @@
         }
         return code;
       },
-
       decode: function(code) {
         let clean = code.replace("+", "").replace(/0/g, "").toUpperCase();
-        let latLo = -90.0;
-        let lngLo = -180.0;
-        let pairs = Math.min(Math.floor(clean.length / 2), 5);
+        let latLo = -90.0, lngLo = -180.0, pairs = Math.min(Math.floor(clean.length / 2), 5);
         for (let i = 0; i < pairs; i++) {
           let latIdx = this.ALPHABET.indexOf(clean[i * 2]);
           let lngIdx = this.ALPHABET.indexOf(clean[i * 2 + 1]);
@@ -237,25 +262,66 @@
           lngLo += lngIdx * res;
         }
         let res = this.RESOLUTIONS[pairs - 1];
-        return {
-          lat: (latLo + res / 2).toFixed(5),
-          lng: (lngLo + res / 2).toFixed(5)
-        };
+        return { lat: (latLo + res / 2).toFixed(5), lng: (lngLo + res / 2).toFixed(5) };
       }
     };
 
-    // Inicializar mapa centrado (Panamá / Chitré)
+    // Inicializar mapa centrado en Panamá (Esri Street Map sin bloqueos)
     const map = L.map('map').setView([8.25, -80.55], 11);
-    
-    // Capa de mapa Esri (Rápida, sin bloqueos y sin claves)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
       attribution: 'Tiles &copy; Esri &mdash; StreetMap', maxZoom: 19
     }).addTo(map);
 
     let communities = JSON.parse(localStorage.getItem('rotary_communities') || '[]');
+    let syncQueue = JSON.parse(localStorage.getItem('rotary_sync_queue') || '[]');
     let markersLayer = L.layerGroup().addTo(map);
     let tempMarker = null;
+
+    function updateSyncUI(message, isError = false) {
+      const syncEl = document.getElementById('syncText');
+      const badgeEl = document.getElementById('queueBadge');
+      if (syncEl) syncEl.innerHTML = message;
+      if (badgeEl) {
+        badgeEl.innerText = `Cola: ${syncQueue.length} pendientes`;
+        badgeEl.style.background = syncQueue.length > 0 ? '#d97706' : '#059669';
+      }
+    }
+
+    // Auto-Sincronización en segundo plano hacia Google Sheets
+    async function attemptSync() {
+      if (!navigator.onLine) {
+        updateSyncUI(`📡 Modo Offline: ${syncQueue.length} registro(s) listos para subirse al detectar señal.`);
+        return;
+      }
+
+      if (syncQueue.length === 0) {
+        updateSyncUI('🟢 Todo sincronizado con Google Drive.');
+        return;
+      }
+
+      updateSyncUI(`⏳ Subiendo ${syncQueue.length} comunidad(es) a Google Sheets...`);
+
+      try {
+        await fetch(GOOGLE_SHEETS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syncQueue)
+        });
+
+        // Al enviarse con éxito, limpiamos la cola
+        syncQueue = [];
+        localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
+        updateSyncUI('✅ ¡Sincronizado exitosamente con tu Google Sheets!');
+      } catch (err) {
+        updateSyncUI('⚠️ Falla de señal temporal. Reintentando automáticamente...');
+      }
+    }
+
+    // Eventos de conectividad automáticos
+    window.addEventListener('online', attemptSync);
+    setInterval(attemptSync, 20000); // Revisa cada 20 segundos
 
     function calcTotal() {
       const bebes = parseInt(document.getElementById('bebes').value) || 0;
@@ -268,10 +334,7 @@
     function setLocation(lat, lng, code = '') {
       document.getElementById('lat').value = lat;
       document.getElementById('lng').value = lng;
-      
-      if (!code) {
-        code = OLC.encode(parseFloat(lat), parseFloat(lng));
-      }
+      if (!code) code = OLC.encode(parseFloat(lat), parseFloat(lng));
       document.getElementById('plusCode').value = code;
 
       const statusEl = document.getElementById('locStatus');
@@ -283,52 +346,32 @@
     }
 
     map.on('click', function(e) {
-      const lat = e.latlng.lat.toFixed(5);
-      const lng = e.latlng.lng.toFixed(5);
-      setLocation(lat, lng);
+      setLocation(e.latlng.lat.toFixed(5), e.latlng.lng.toFixed(5));
     });
 
     function decodePlusCode() {
       let raw = document.getElementById('plusCode').value.trim();
-      if (!raw) {
-        alert("Por favor escribe o pega un Plus Code de Google Maps.");
-        return;
-      }
-
-      // Si pegaron texto con ciudad (ej: '6CVQ+95 Chitré, Herrera'), extraer solo el código
+      if (!raw) return alert("Por favor escribe o pega un Plus Code de Google Maps.");
       let token = raw.split(/[\s,]+/)[0].toUpperCase();
-      if (!token.includes('+')) {
-        alert("El Plus Code debe incluir el signo '+' (ejemplo: 6CVQ+95 o 66WX6CVQ+95).");
-        return;
-      }
+      if (!token.includes('+')) return alert("El Plus Code debe incluir '+' (ej: 6CVQ+95 o 66WX6CVQ+95).");
 
       let fullCode = token;
       let sepIdx = token.indexOf('+');
-
-      // Si es un código corto (ej: 6CVQ+95 donde la '+' está en posición 4), completarlo con la referencia actual del mapa
       if (sepIdx < 8) {
         const center = map.getCenter();
         const refCode = OLC.encode(center.lat, center.lng);
-        const missingLength = 8 - sepIdx;
-        fullCode = refCode.substring(0, missingLength) + token;
+        fullCode = refCode.substring(0, 8 - sepIdx) + token;
       }
 
       const coords = OLC.decode(fullCode);
-      if (!coords) {
-        alert("No se pudo decodificar el Plus Code. Revisa que los caracteres sean válidos.");
-        return;
-      }
+      if (!coords) return alert("No se pudo decodificar el Plus Code.");
 
       setLocation(coords.lat, coords.lng, fullCode);
       map.setView([coords.lat, coords.lng], 16);
     }
 
     function getLocation() {
-      if (!navigator.geolocation) {
-        alert("Tu dispositivo no soporta geolocalización.");
-        return;
-      }
-      
+      if (!navigator.geolocation) return alert("Tu dispositivo no soporta geolocalización.");
       const btn = document.querySelector('.btn-gps');
       const originalText = btn.innerHTML;
       btn.innerHTML = "⏳ Obteniendo GPS...";
@@ -341,15 +384,12 @@
           setLocation(lat, lng);
           map.setView([lat, lng], 16);
           btn.innerHTML = "✅ Ubicación obtenida";
-          setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-          }, 2000);
+          setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
         },
-        (error) => {
+        () => {
           btn.innerHTML = originalText;
           btn.disabled = false;
-          alert("No se pudo acceder al GPS. Asegúrate de encender la ubicación del teléfono o pulsa directamente sobre el mapa.");
+          alert("No se pudo acceder al GPS. Asegúrate de encender la ubicación de tu móvil.");
         },
         { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
       );
@@ -384,9 +424,10 @@
         
         marker.bindPopup(`
           <strong>${c.nombre}</strong><br>
+          <b>Brigadista:</b> ${c.brigadista || 'N/A'}<br>
           <b>Estado:</b> ${c.estado}<br>
           ${c.plusCode ? `<b>Plus Code:</b> ${c.plusCode}<br>` : ''}
-          <b>Personas:</b> ${c.total} (Bebés: ${c.bebes}, Niños: ${c.ninos}, Adultos: ${c.adultos || 0}, Mayores: ${c.mayores})<br>
+          <b>Personas:</b> ${c.total} (B: ${c.bebes}, N: ${c.ninos}, A: ${c.adultos || 0}, M: ${c.mayores})<br>
           <b>Enfermos:</b> N:${c.ninosEnfermos} | A:${c.adultosEnfermos} | M:${c.mayoresEnfermos}<br>
           <b>Mascotas:</b> 🐕 ${c.perros} | 🐈 ${c.gatos}<br>
           <b>Necesitan:</b> ${c.insumos.join(', ') || 'No especificado'}<br>
@@ -426,6 +467,7 @@
       document.getElementById('totalEnfermos').innerText = totalEnf;
 
       localStorage.setItem('rotary_communities', JSON.stringify(communities));
+      updateSyncUI(syncQueue.length === 0 ? '🟢 Todo sincronizado con Google Drive.' : `🟡 ${syncQueue.length} pendiente(s) por sincronizar.`);
     }
 
     function saveCommunity(e) {
@@ -435,7 +477,7 @@
       const lng = document.getElementById('lng').value;
 
       if (!lat || !lng) {
-        alert("Por favor define la ubicación ingresando un Plus Code, usando el GPS o tocando el mapa.");
+        alert("Por favor fija la ubicación con el Plus Code, el GPS o tocando el mapa.");
         return;
       }
 
@@ -448,9 +490,10 @@
       if (document.getElementById('insumoColchones').checked) insumos.push('Colchones/Palets');
 
       const data = {
-        nombre: document.getElementById('nombre').value,
+        brigadista: document.getElementById('brigadista').value.trim() || 'Voluntario',
+        nombre: document.getElementById('nombre').value.trim(),
         estado: document.getElementById('estado').value,
-        contacto: document.getElementById('contacto').value,
+        contacto: document.getElementById('contacto').value.trim(),
         plusCode: document.getElementById('plusCode').value,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
@@ -468,11 +511,21 @@
         perros: parseInt(document.getElementById('perros').value) || 0,
         gatos: parseInt(document.getElementById('gatos').value) || 0,
         insumos: insumos,
-        observaciones: document.getElementById('observaciones').value
+        observaciones: document.getElementById('observaciones').value.trim()
       };
 
+      // 1. Guardar localmente para mapa inmediato
       communities.push(data);
       render();
+
+      // 2. Encolar para auto-sincronización con Google Sheets
+      syncQueue.push(data);
+      localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
+      
+      // 3. Intentar subir de inmediato
+      attemptSync();
+
+      // Limpiar formulario
       document.getElementById('communityForm').reset();
       calcTotal();
       document.getElementById('lat').value = '';
@@ -483,7 +536,7 @@
     }
 
     function deleteCommunity(index) {
-      if (confirm('¿Deseas eliminar este registro?')) {
+      if (confirm('¿Deseas eliminar este registro local?')) {
         communities.splice(index, 1);
         render();
       }
@@ -506,10 +559,10 @@
     }
 
     function exportDataCSV() {
-      if (communities.length === 0) return alert('No hay datos registrados para exportar.');
-      let csv = 'Nombre,Estado,PlusCode,Latitud,Longitud,Contacto,Total,Bebes,Ninos,Adultos,Mayores,Ninos_Enfermos,Adultos_Enfermos,Mayores_Enfermos,Perros,Gatos,Insumos,Observaciones\n';
+      if (communities.length === 0) return alert('No hay datos para exportar.');
+      let csv = 'Fecha,Brigadista,Comunidad,Estado,PlusCode,Latitud,Longitud,Contacto,Total,Bebes,Ninos,Adultos,Mayores,Ninos_Enfermos,Adultos_Enfermos,Mayores_Enfermos,Perros,Gatos,Insumos,Observaciones\n';
       communities.forEach(c => {
-        csv += `"${c.nombre}","${c.estado}","${c.plusCode || ''}",${c.lat},${c.lng},"${c.contacto || ''}",${c.total},${c.bebes},${c.ninos},${c.adultos || 0},${c.mayores},${c.ninosEnfermos},${c.adultosEnfermos},${c.mayoresEnfermos},${c.perros},${c.gatos},"${c.insumos.join(';') || ''}","${c.observaciones || ''}"\n`;
+        csv += `"${new Date().toLocaleDateString()}","${c.brigadista || ''}","${c.nombre}","${c.estado}","${c.plusCode || ''}",${c.lat},${c.lng},"${c.contacto || ''}",${c.total},${c.bebes},${c.ninos},${c.adultos || 0},${c.mayores},${c.ninosEnfermos},${c.adultosEnfermos},${c.mayoresEnfermos},${c.perros},${c.gatos},"${c.insumos.join(';') || ''}","${c.observaciones || ''}"\n`;
       });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
@@ -528,7 +581,7 @@
           if (Array.isArray(imported)) {
             communities = communities.concat(imported);
             render();
-            alert('¡Puntos importados y consolidados exitosamente!');
+            alert('¡Puntos importados con éxito!');
           }
         } catch (err) {
           alert('Error al leer el archivo JSON.');
@@ -538,6 +591,7 @@
     }
 
     render();
+    attemptSync();
   </script>
 </body>
 </html>
