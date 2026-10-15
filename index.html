@@ -158,6 +158,16 @@
         </div>
 
         <!-- Módulo de Ubicación Inteligente -->
+        
+        <!-- Búsqueda de Lugares / Direcciones en el Mapa -->
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label>🔍 Buscar Pueblo, Escuela o Lugar</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="searchPlaceInput" placeholder="Ej: Escuela La Colorada, Chitré..." onkeydown="if(event.key==='Enter'){event.preventDefault();searchPlace();}">
+            <button type="button" class="btn btn-sm btn-primary" onclick="searchPlace()">Buscar</button>
+          </div>
+        </div>
+
         <div class="location-box">
           <label>📍 Ubicación (Plus Code de Google Maps)</label>
           <div style="display: flex; gap: 6px; margin-top: 4px;">
@@ -266,12 +276,70 @@
       }
     };
 
-    // Inicializar mapa centrado en Panamá (Esri Street Map sin bloqueos)
-    const map = L.map('map').setView([8.25, -80.55], 11);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    // Capas de Mapa estilo Google Maps (Calles y Satélite)
+    const googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains:['mt0','mt1','mt2','mt3'],
+      attribution: '&copy; Google Maps'
+    });
+
+    const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains:['mt0','mt1','mt2','mt3'],
+      attribution: '&copy; Google Maps Satélite'
+    });
+
+    const esriStreets = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: 'Tiles &copy; Esri &mdash; StreetMap', maxZoom: 19
-    }).addTo(map);
+      attribution: 'Tiles &copy; Esri'
+    });
+
+    // Iniciar con Google Calles por defecto
+    const map = L.map('map', {
+      center: [8.25, -80.55],
+      zoom: 11,
+      layers: [googleStreets]
+    });
+
+    // Control para alternar entre Google Calles, Google Satélite y Esri
+    const baseMaps = {
+      "🗺️ Google Calles": googleStreets,
+      "🛰️ Google Satélite": googleHybrid,
+      "🌐 Esri Calles": esriStreets
+    };
+    L.control.layers(baseMaps).addTo(map);
+
+    // Función para buscar pueblos, escuelas o lugares por nombre (Geocoding)
+    async function searchPlace() {
+      const query = document.getElementById('searchPlaceInput').value.trim();
+      if (!query) return alert("Escribe un lugar para buscar.");
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Panama')}`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const first = data[0];
+          const lat = parseFloat(first.lat).toFixed(5);
+          const lng = parseFloat(first.lon).toFixed(5);
+          setLocation(lat, lng);
+          map.setView([lat, lng], 16);
+        } else {
+          const res2 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+          const data2 = await res2.json();
+          if (data2 && data2.length > 0) {
+            const first = data2[0];
+            const lat = parseFloat(first.lat).toFixed(5);
+            const lng = parseFloat(first.lon).toFixed(5);
+            setLocation(lat, lng);
+            map.setView([lat, lng], 16);
+          } else {
+            alert("No se encontró el lugar. Puedes ubicarlo tocando el mapa o pegando el Plus Code.");
+          }
+        }
+      } catch (e) {
+        alert("Error al buscar el lugar. Verifica tu conexión.");
+      }
+    }
 
     let communities = JSON.parse(localStorage.getItem('rotary_communities') || '[]');
     let syncQueue = JSON.parse(localStorage.getItem('rotary_sync_queue') || '[]');
@@ -310,7 +378,6 @@
           body: JSON.stringify(syncQueue)
         });
 
-        // Al enviarse con éxito, limpiamos la cola
         syncQueue = [];
         localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
         updateSyncUI('✅ ¡Sincronizado exitosamente con tu Google Sheets!');
@@ -321,7 +388,7 @@
 
     // Eventos de conectividad automáticos
     window.addEventListener('online', attemptSync);
-    setInterval(attemptSync, 20000); // Revisa cada 20 segundos
+    setInterval(attemptSync, 20000);
 
     function calcTotal() {
       const bebes = parseInt(document.getElementById('bebes').value) || 0;
@@ -514,18 +581,14 @@
         observaciones: document.getElementById('observaciones').value.trim()
       };
 
-      // 1. Guardar localmente para mapa inmediato
       communities.push(data);
       render();
 
-      // 2. Encolar para auto-sincronización con Google Sheets
       syncQueue.push(data);
       localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
       
-      // 3. Intentar subir de inmediato
       attemptSync();
 
-      // Limpiar formulario
       document.getElementById('communityForm').reset();
       calcTotal();
       document.getElementById('lat').value = '';
