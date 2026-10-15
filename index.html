@@ -356,33 +356,62 @@
       }
     }
 
-    // Auto-Sincronización en segundo plano hacia Google Sheets
+    // Sincronización bidireccional (Subir pendientes y descargar lo de todos los brigadistas)
     async function attemptSync() {
       if (!navigator.onLine) {
-        updateSyncUI(`📡 Modo Offline: ${syncQueue.length} registro(s) listos para subirse al detectar señal.`);
+        updateSyncUI(`📡 Modo Offline: ${syncQueue.length} pendiente(s). Datos locales protegidos.`);
         return;
       }
 
-      if (syncQueue.length === 0) {
-        updateSyncUI('🟢 Todo sincronizado con Google Drive.');
-        return;
+      // 1. Subir registros pendientes de este celular si los hay
+      if (syncQueue.length > 0) {
+        updateSyncUI(`⏳ Subiendo ${syncQueue.length} comunidad(es) a la nube...`);
+        try {
+          await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(syncQueue)
+          });
+          syncQueue = [];
+          localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
+        } catch (err) {
+          console.error("Error al subir cola:", err);
+        }
       }
 
-      updateSyncUI(`⏳ Subiendo ${syncQueue.length} comunidad(es) a Google Sheets...`);
-
+      // 2. Descargar todos los puntos registrados por todos los brigadistas desde Google Sheets
+      updateSyncUI('⏳ Actualizando mapa de brigadas en vivo...');
       try {
-        await fetch(GOOGLE_SHEETS_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncQueue)
-        });
+        const resp = await fetch(GOOGLE_SHEETS_URL);
+        const cloudData = await resp.json();
+        
+        if (Array.isArray(cloudData) && cloudData.length > 0) {
+          // Unir evitando duplicados
+          const mapKey = c => `${c.nombre}_${Number(c.lat).toFixed(4)}_${Number(c.lng).toFixed(4)}`;
+          const existingKeys = new Set(communities.map(mapKey));
+          
+          cloudData.forEach(item => {
+            const key = mapKey(item);
+            if (!existingKeys.has(key)) {
+              communities.push(item);
+              existingKeys.add(key);
+            } else {
+              // Actualizar estado si cambió en la hoja
+              const idx = communities.findIndex(c => mapKey(c) === key);
+              if (idx !== -1 && item.estado) {
+                communities[idx].estado = item.estado;
+              }
+            }
+          });
 
-        syncQueue = [];
-        localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
-        updateSyncUI('✅ ¡Sincronizado exitosamente con tu Google Sheets!');
-      } catch (err) {
-        updateSyncUI('⚠️ Falla de señal temporal. Reintentando automáticamente...');
+          localStorage.setItem('rotary_communities', JSON.stringify(communities));
+          render();
+        }
+        updateSyncUI('🟢 Todo sincronizado y actualizado con la nube.');
+      } catch (e) {
+        // Si no devuelve GET aún, mantener status
+        updateSyncUI(syncQueue.length === 0 ? '🟢 Sincronizado con Google Drive.' : `🟡 ${syncQueue.length} pendiente(s).`);
       }
     }
 
