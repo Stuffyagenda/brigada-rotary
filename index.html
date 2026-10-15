@@ -3,6 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA & Mobile Web App Capabilities -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Brigada Rotary">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>🗺️</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>🗺️</text></svg>">
+  
+  <script>
+    // Inyectar Manifest PWA dinámicamente
+    const manifestJSON = {
+      "name": "Brigada Solidaria Rotary",
+      "short_name": "BrigadaRotary",
+      "start_url": ".",
+      "display": "standalone",
+      "background_color": "#1e3a8a",
+      "theme_color": "#1e3a8a",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>🗺️</text></svg>",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml",
+          "purpose": "any maskable"
+        }
+      ]
+    };
+    const stringManifest = JSON.stringify(manifestJSON);
+    const blobManifest = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blobManifest);
+    const linkManifest = document.createElement('link');
+    linkManifest.rel = 'manifest';
+    linkManifest.href = manifestURL;
+    document.head.appendChild(linkManifest);
+
+    // Registrar Service Worker para permitir instalación formal como PWA y modo pantalla completa
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          self.addEventListener('install', e => self.skipWaiting());
+          self.addEventListener('activate', e => clients.claim());
+          self.addEventListener('fetch', e => {});
+        `;
+        const blobSW = new Blob([swCode], {type: 'application/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(blobSW))
+          .catch(err => console.log('SW registration skipped', err));
+      });
+    }
+  </script>
+
   <title>Brigada Solidaria Rotary - Registro de Campo</title>
   
   <!-- Leaflet CSS y JS -->
