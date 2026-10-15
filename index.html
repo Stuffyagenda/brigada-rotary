@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brigada Solidaria Rotary - Registro de Campo</title>
+  
+  <!-- Leaflet CSS y JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-hover: #1e40af;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --gray: #6b7280;
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; }
+    
+    header { background-color: var(--primary); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
+    header h1 { font-size: 1.15rem; font-weight: 700; }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    .btn { background-color: white; color: var(--primary); border: none; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+    .btn-gps { background-color: #0284c7; color: white; width: 100%; margin-bottom: 8px; }
+    .btn-gps:hover { background-color: #0369a1; }
+    .btn-danger { background-color: var(--danger); color: white; }
+    .btn-success { background-color: var(--success); color: white; }
+    .btn-sm { padding: 5px 9px; font-size: 0.75rem; }
+
+    .main-layout { display: grid; grid-template-columns: 390px 1fr; flex: 1; height: calc(100vh - 65px); }
+    @media (max-width: 900px) {
+      .main-layout { grid-template-columns: 1fr; height: auto; }
+      #map { height: 400px !important; }
+    }
+
+    .sidebar { background: var(--card-bg); overflow-y: auto; padding: 16px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 16px; }
+    
+    .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; background: #eef2ff; padding: 10px; border-radius: 8px; }
+    .stat-box { font-size: 0.75rem; color: #4338ca; }
+    .stat-box strong { display: block; font-size: 1.1rem; color: #1e1b4b; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    label { font-size: 0.8rem; font-weight: 600; color: #374151; }
+    input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem; }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+    .location-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .loc-status { font-size: 0.75rem; margin-top: 5px; color: #059669; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+    .loc-status.empty { color: #dc2626; }
+
+    .checkbox-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; font-size: 0.8rem; }
+    .checkbox-group label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
+
+    .card-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .card { background: white; border: 1px solid #e5e7eb; border-left: 5px solid var(--danger); border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .card.atendido { border-left-color: var(--success); }
+    .card.no-viable { border-left-color: var(--gray); }
+    .card h3 { font-size: 0.95rem; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .card p { font-size: 0.8rem; color: #4b5563; margin-bottom: 3px; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .badge-danger { background: #fee2e2; color: #b91c1c; }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-gray { background: #f3f4f6; color: #4b5563; }
+
+    #map { width: 100%; height: 100%; min-height: 400px; }
+    
+    .pulse-marker { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+    .marker-red { background: #ef4444; }
+    .marker-green { background: #22c55e; }
+    .marker-gray { background: #6b7280; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Brigada Rotary - Logística Humanitaria</h1>
+    <div class="header-actions">
+      <button class="btn btn-sm" onclick="exportDataJSON()">📥 Exportar JSON</button>
+      <button class="btn btn-sm" onclick="exportDataCSV()">📊 Exportar CSV</button>
+      <input type="file" id="fileInput" accept=".json" style="display:none" onchange="importDataJSON(event)">
+      <button class="btn btn-sm" onclick="document.getElementById('fileInput').click()">📤 Importar</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Panel Lateral -->
+    <div class="sidebar">
+      <div class="stats-bar">
+        <div class="stat-box"><strong id="totalComunidades">0</strong>Lugares</div>
+        <div class="stat-box"><strong id="totalAfectados">0</strong>Personas</div>
+        <div class="stat-box"><strong id="totalInfantes">0</strong>Bebés/Niños</div>
+        <div class="stat-box"><strong id="totalEnfermos">0</strong>Enfermos</div>
+      </div>
+
+      <!-- Formulario de Registro -->
+      <form id="communityForm" onsubmit="saveCommunity(event)">
+        <h2 style="font-size: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 10px;">Registrar Comunidad</h2>
+        
+        <div class="form-group">
+          <label>Nombre de la Comunidad / Caserío *</label>
+          <input type="text" id="nombre" required placeholder="Ej: Caserío La Esperanza">
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Estado *</label>
+            <select id="estado">
+              <option value="Pendiente">🔴 Pendiente / Ocupa donación</option>
+              <option value="Atendido">🟢 Atendido / Cubierto</option>
+              <option value="No Viable">⚪ No viable / Inaccesible</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Contacto / Celular</label>
+            <input type="text" id="contacto" placeholder="Nombre y teléfono">
+          </div>
+        </div>
+
+        <!-- Módulo de Ubicación Inteligente -->
+        <div class="location-box">
+          <label>📍 Ubicación (Plus Code de Google Maps)</label>
+          <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <input type="text" id="plusCode" placeholder="Ej: 6CVQ+95 o 66WX6CVQ+95">
+            <button type="button" class="btn btn-sm btn-primary" onclick="decodePlusCode()">Ubicar</button>
+          </div>
+
+          <div style="margin: 8px 0; text-align: center; font-size: 0.75rem; color: #64748b;">— O usa una de estas opciones —</div>
+
+          <button type="button" class="btn btn-gps" onclick="getLocation()">
+            📡 Usar mi Ubicación Actual (GPS)
+          </button>
+          <div style="font-size: 0.75rem; color: #64748b; text-align: center;">O toca directamente cualquier punto en el mapa</div>
+
+          <input type="hidden" id="lat">
+          <input type="hidden" id="lng">
+          <div id="locStatus" class="loc-status empty">⚠️ Aún no has fijado la ubicación</div>
+        </div>
+
+        <!-- Censo Demográfico -->
+        <label style="margin-top: 6px;">Censo de Personas (Total automático)</label>
+        <div class="grid-2">
+          <div class="form-group"><label>Bebés</label><input type="number" id="bebes" value="0" min="0" oninput="calcTotal()"></div>
+          <div class="form-group"><label>Niños</label><input type="number" id="ninos" value="0" min="0" oninput="calcTotal()"></div>
+          <div class="form-group"><label>Adultos</label><input type="number" id="adultos" value="0" min="0" oninput="calcTotal()"></div>
+          <div class="form-group"><label>Adultos Mayores</label><input type="number" id="mayores" value="0" min="0" oninput="calcTotal()"></div>
+        </div>
+        <div class="form-group" style="margin-top: 4px;">
+          <label style="color: var(--primary);">Total Personas (Cálculo automático)</label>
+          <input type="number" id="total" value="0" readonly style="background: #eef2ff; font-weight: bold; color: var(--primary);">
+        </div>
+
+        <!-- Salud y Mascotas -->
+        <label>Salud y Mascotas</label>
+        <div class="grid-3">
+          <div class="form-group"><label>Niños Enfermos</label><input type="number" id="ninosEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Adultos Enfermos</label><input type="number" id="adultosEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Mayores Enfermos</label><input type="number" id="mayoresEnfermos" value="0" min="0"></div>
+          <div class="form-group"><label>Perros</label><input type="number" id="perros" value="0" min="0"></div>
+          <div class="form-group"><label>Gatos</label><input type="number" id="gatos" value="0" min="0"></div>
+        </div>
+
+        <!-- Insumos Requeridos / Cubiertos -->
+        <label style="margin-top: 6px;">Insumos y Necesidades</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" id="insumoAlimento"> 🍞 Alimento</label>
+          <label><input type="checkbox" id="insumoLimpieza"> 🧹 Limpieza</label>
+          <label><input type="checkbox" id="insumoAseo"> 🧼 Aseo Personal</label>
+          <label><input type="checkbox" id="insumoCarpas"> ⛺ Carpas / Toldas</label>
+          <label><input type="checkbox" id="insumoCamping"> 🎒 Camping</label>
+          <label><input type="checkbox" id="insumoColchones"> 🛏️ Colchones/Palets</label>
+        </div>
+
+        <div class="form-group" style="margin-top: 8px;">
+          <label>Observaciones / Acceso a la zona</label>
+          <textarea id="observaciones" rows="2" placeholder="Caminos de tierra, ríos crecidos, vehículos 4x4..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">Guardar Comunidad</button>
+      </form>
+
+      <h3 style="font-size: 0.95rem; margin-top: 10px;">Comunidades Registradas</h3>
+      <div class="card-list" id="communityList"></div>
+    </div>
+
+    <!-- Mapa Interactivo -->
+    <div id="map"></div>
+  </div>
+
+  <script>
+    // ==========================================
+    // MOTOR PLUS CODE (STANDALONE 100% OFFLINE)
+    // ==========================================
+    const OLC = {
+      ALPHABET: "23456789CFGHJMPQRVWX",
+      RESOLUTIONS: [20.0, 1.0, 0.05, 0.0025, 0.000125],
+      
+      encode: function(lat, lng) {
+        lat = Math.min(Math.max(lat, -90.0), 90.0);
+        lng = ((lng + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+        let latVal = lat + 90.0;
+        let lngVal = lng + 180.0;
+        let code = "";
+        for (let i = 0; i < 5; i++) {
+          let res = this.RESOLUTIONS[i];
+          let latDigit = Math.floor(latVal / res);
+          let lngDigit = Math.floor(lngVal / res);
+          latVal -= latDigit * res;
+          lngVal -= lngDigit * res;
+          code += this.ALPHABET[latDigit] + this.ALPHABET[lngDigit];
+          if (i === 3) code += "+";
+        }
+        return code;
+      },
+
+      decode: function(code) {
+        let clean = code.replace("+", "").replace(/0/g, "").toUpperCase();
+        let latLo = -90.0;
+        let lngLo = -180.0;
+        let pairs = Math.min(Math.floor(clean.length / 2), 5);
+        for (let i = 0; i < pairs; i++) {
+          let latIdx = this.ALPHABET.indexOf(clean[i * 2]);
+          let lngIdx = this.ALPHABET.indexOf(clean[i * 2 + 1]);
+          if (latIdx === -1 || lngIdx === -1) return null;
+          let res = this.RESOLUTIONS[i];
+          latLo += latIdx * res;
+          lngLo += lngIdx * res;
+        }
+        let res = this.RESOLUTIONS[pairs - 1];
+        return {
+          lat: (latLo + res / 2).toFixed(5),
+          lng: (lngLo + res / 2).toFixed(5)
+        };
+      }
+    };
+
+    // Inicializar mapa centrado (Panamá / Chitré)
+    const map = L.map('map').setView([8.25, -80.55], 11);
+    
+    // Capa de mapa Esri (Rápida, sin bloqueos y sin claves)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; Esri &mdash; StreetMap', maxZoom: 19
+    }).addTo(map);
+
+    let communities = JSON.parse(localStorage.getItem('rotary_communities') || '[]');
+    let markersLayer = L.layerGroup().addTo(map);
+    let tempMarker = null;
+
+    function calcTotal() {
+      const bebes = parseInt(document.getElementById('bebes').value) || 0;
+      const ninos = parseInt(document.getElementById('ninos').value) || 0;
+      const adultos = parseInt(document.getElementById('adultos').value) || 0;
+      const mayores = parseInt(document.getElementById('mayores').value) || 0;
+      document.getElementById('total').value = bebes + ninos + adultos + mayores;
+    }
+
+    function setLocation(lat, lng, code = '') {
+      document.getElementById('lat').value = lat;
+      document.getElementById('lng').value = lng;
+      
+      if (!code) {
+        code = OLC.encode(parseFloat(lat), parseFloat(lng));
+      }
+      document.getElementById('plusCode').value = code;
+
+      const statusEl = document.getElementById('locStatus');
+      statusEl.className = 'loc-status';
+      statusEl.innerHTML = `✅ Ubicación fijada: ${code}`;
+
+      if (tempMarker) map.removeLayer(tempMarker);
+      tempMarker = L.circleMarker([lat, lng], { radius: 8, color: '#1e3a8a', fillColor: '#3b82f6', fillOpacity: 0.8 }).addTo(map);
+    }
+
+    map.on('click', function(e) {
+      const lat = e.latlng.lat.toFixed(5);
+      const lng = e.latlng.lng.toFixed(5);
+      setLocation(lat, lng);
+    });
+
+    function decodePlusCode() {
+      let raw = document.getElementById('plusCode').value.trim();
+      if (!raw) {
+        alert("Por favor escribe o pega un Plus Code de Google Maps.");
+        return;
+      }
+
+      // Si pegaron texto con ciudad (ej: '6CVQ+95 Chitré, Herrera'), extraer solo el código
+      let token = raw.split(/[\s,]+/)[0].toUpperCase();
+      if (!token.includes('+')) {
+        alert("El Plus Code debe incluir el signo '+' (ejemplo: 6CVQ+95 o 66WX6CVQ+95).");
+        return;
+      }
+
+      let fullCode = token;
+      let sepIdx = token.indexOf('+');
+
+      // Si es un código corto (ej: 6CVQ+95 donde la '+' está en posición 4), completarlo con la referencia actual del mapa
+      if (sepIdx < 8) {
+        const center = map.getCenter();
+        const refCode = OLC.encode(center.lat, center.lng);
+        const missingLength = 8 - sepIdx;
+        fullCode = refCode.substring(0, missingLength) + token;
+      }
+
+      const coords = OLC.decode(fullCode);
+      if (!coords) {
+        alert("No se pudo decodificar el Plus Code. Revisa que los caracteres sean válidos.");
+        return;
+      }
+
+      setLocation(coords.lat, coords.lng, fullCode);
+      map.setView([coords.lat, coords.lng], 16);
+    }
+
+    function getLocation() {
+      if (!navigator.geolocation) {
+        alert("Tu dispositivo no soporta geolocalización.");
+        return;
+      }
+      
+      const btn = document.querySelector('.btn-gps');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = "⏳ Obteniendo GPS...";
+      btn.disabled = true;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude.toFixed(5);
+          const lng = position.coords.longitude.toFixed(5);
+          setLocation(lat, lng);
+          map.setView([lat, lng], 16);
+          btn.innerHTML = "✅ Ubicación obtenida";
+          setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }, 2000);
+        },
+        (error) => {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          alert("No se pudo acceder al GPS. Asegúrate de encender la ubicación del teléfono o pulsa directamente sobre el mapa.");
+        },
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+      );
+    }
+
+    function getCustomIcon(estado) {
+      let colorClass = 'marker-red';
+      if (estado === 'Atendido') colorClass = 'marker-green';
+      if (estado === 'No Viable') colorClass = 'marker-gray';
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div class="pulse-marker ${colorClass}"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+    }
+
+    function render() {
+      markersLayer.clearLayers();
+      const listContainer = document.getElementById('communityList');
+      listContainer.innerHTML = '';
+
+      let totalPers = 0, totalInf = 0, totalEnf = 0;
+
+      communities.forEach((c, index) => {
+        totalPers += Number(c.total || 0);
+        totalInf += Number(c.bebes || 0) + Number(c.ninos || 0);
+        totalEnf += Number(c.ninosEnfermos || 0) + Number(c.adultosEnfermos || 0) + Number(c.mayoresEnfermos || 0);
+
+        const marker = L.marker([c.lat, c.lng], { icon: getCustomIcon(c.estado) });
+        const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`;
+        
+        marker.bindPopup(`
+          <strong>${c.nombre}</strong><br>
+          <b>Estado:</b> ${c.estado}<br>
+          ${c.plusCode ? `<b>Plus Code:</b> ${c.plusCode}<br>` : ''}
+          <b>Personas:</b> ${c.total} (Bebés: ${c.bebes}, Niños: ${c.ninos}, Adultos: ${c.adultos || 0}, Mayores: ${c.mayores})<br>
+          <b>Enfermos:</b> N:${c.ninosEnfermos} | A:${c.adultosEnfermos} | M:${c.mayoresEnfermos}<br>
+          <b>Mascotas:</b> 🐕 ${c.perros} | 🐈 ${c.gatos}<br>
+          <b>Necesitan:</b> ${c.insumos.join(', ') || 'No especificado'}<br>
+          <div style="margin-top: 8px; display: flex; gap: 6px;">
+            <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-primary">🚗 Cómo llegar</a>
+            <button onclick="deleteCommunity(${index})" class="btn btn-sm btn-danger">Eliminar</button>
+          </div>
+        `);
+        markersLayer.addLayer(marker);
+
+        let badgeClass = c.estado === 'Atendido' ? 'badge-success' : (c.estado === 'No Viable' ? 'badge-gray' : 'badge-danger');
+        let cardClass = c.estado === 'Atendido' ? 'atendido' : (c.estado === 'No Viable' ? 'no-viable' : '');
+
+        const card = document.createElement('div');
+        card.className = `card ${cardClass}`;
+        card.innerHTML = `
+          <h3>
+            <span>${c.nombre}</span>
+            <span class="badge ${badgeClass}">${c.estado}</span>
+          </h3>
+          ${c.plusCode ? `<p style="font-size:0.75rem; color:#1e40af;"><strong>Plus Code:</strong> ${c.plusCode}</p>` : ''}
+          <p><strong>Total:</strong> ${c.total} pers. (Infantes: ${Number(c.bebes)+Number(c.ninos)}, Mayores: ${c.mayores})</p>
+          <p><strong>Necesidades:</strong> ${c.insumos.join(', ') || 'Sin insumos marcados'}</p>
+          <p><strong>Contacto:</strong> ${c.contacto || 'Sin contacto'}</p>
+          <div style="display:flex; justify-content:space-between; margin-top:6px; gap:4px;">
+            <a href="${gmapsUrl}" target="_blank" class="btn btn-sm" style="border:1px solid #d1d5db;">📍 GPS</a>
+            <button onclick="toggleEstado(${index})" class="btn btn-sm btn-primary">Cambiar Estado</button>
+            <button onclick="deleteCommunity(${index})" class="btn btn-sm btn-danger">🗑️</button>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+
+      document.getElementById('totalComunidades').innerText = communities.length;
+      document.getElementById('totalAfectados').innerText = totalPers;
+      document.getElementById('totalInfantes').innerText = totalInf;
+      document.getElementById('totalEnfermos').innerText = totalEnf;
+
+      localStorage.setItem('rotary_communities', JSON.stringify(communities));
+    }
+
+    function saveCommunity(e) {
+      e.preventDefault();
+      
+      const lat = document.getElementById('lat').value;
+      const lng = document.getElementById('lng').value;
+
+      if (!lat || !lng) {
+        alert("Por favor define la ubicación ingresando un Plus Code, usando el GPS o tocando el mapa.");
+        return;
+      }
+
+      const insumos = [];
+      if (document.getElementById('insumoAlimento').checked) insumos.push('Alimento');
+      if (document.getElementById('insumoLimpieza').checked) insumos.push('Limpieza');
+      if (document.getElementById('insumoAseo').checked) insumos.push('Aseo');
+      if (document.getElementById('insumoCarpas').checked) insumos.push('Carpas/Toldas');
+      if (document.getElementById('insumoCamping').checked) insumos.push('Camping');
+      if (document.getElementById('insumoColchones').checked) insumos.push('Colchones/Palets');
+
+      const data = {
+        nombre: document.getElementById('nombre').value,
+        estado: document.getElementById('estado').value,
+        contacto: document.getElementById('contacto').value,
+        plusCode: document.getElementById('plusCode').value,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        bebes: parseInt(document.getElementById('bebes').value) || 0,
+        ninos: parseInt(document.getElementById('ninos').value) || 0,
+        adultos: parseInt(document.getElementById('adultos').value) || 0,
+        mayores: parseInt(document.getElementById('mayores').value) || 0,
+        total: (parseInt(document.getElementById('bebes').value) || 0) + 
+               (parseInt(document.getElementById('ninos').value) || 0) + 
+               (parseInt(document.getElementById('adultos').value) || 0) + 
+               (parseInt(document.getElementById('mayores').value) || 0),
+        ninosEnfermos: parseInt(document.getElementById('ninosEnfermos').value) || 0,
+        adultosEnfermos: parseInt(document.getElementById('adultosEnfermos').value) || 0,
+        mayoresEnfermos: parseInt(document.getElementById('mayoresEnfermos').value) || 0,
+        perros: parseInt(document.getElementById('perros').value) || 0,
+        gatos: parseInt(document.getElementById('gatos').value) || 0,
+        insumos: insumos,
+        observaciones: document.getElementById('observaciones').value
+      };
+
+      communities.push(data);
+      render();
+      document.getElementById('communityForm').reset();
+      calcTotal();
+      document.getElementById('lat').value = '';
+      document.getElementById('lng').value = '';
+      document.getElementById('locStatus').className = 'loc-status empty';
+      document.getElementById('locStatus').innerHTML = '⚠️ Aún no has fijado la ubicación';
+      if (tempMarker) map.removeLayer(tempMarker);
+    }
+
+    function deleteCommunity(index) {
+      if (confirm('¿Deseas eliminar este registro?')) {
+        communities.splice(index, 1);
+        render();
+      }
+    }
+
+    function toggleEstado(index) {
+      const actual = communities[index].estado;
+      if (actual === 'Pendiente') communities[index].estado = 'Atendido';
+      else if (actual === 'Atendido') communities[index].estado = 'No Viable';
+      else communities[index].estado = 'Pendiente';
+      render();
+    }
+
+    function exportDataJSON() {
+      const blob = new Blob([JSON.stringify(communities, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `reporte_rotary_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    }
+
+    function exportDataCSV() {
+      if (communities.length === 0) return alert('No hay datos registrados para exportar.');
+      let csv = 'Nombre,Estado,PlusCode,Latitud,Longitud,Contacto,Total,Bebes,Ninos,Adultos,Mayores,Ninos_Enfermos,Adultos_Enfermos,Mayores_Enfermos,Perros,Gatos,Insumos,Observaciones\n';
+      communities.forEach(c => {
+        csv += `"${c.nombre}","${c.estado}","${c.plusCode || ''}",${c.lat},${c.lng},"${c.contacto || ''}",${c.total},${c.bebes},${c.ninos},${c.adultos || 0},${c.mayores},${c.ninosEnfermos},${c.adultosEnfermos},${c.mayoresEnfermos},${c.perros},${c.gatos},"${c.insumos.join(';') || ''}","${c.observaciones || ''}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `censo_rotary_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    }
+
+    function importDataJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const imported = JSON.parse(event.target.result);
+          if (Array.isArray(imported)) {
+            communities = communities.concat(imported);
+            render();
+            alert('¡Puntos importados y consolidados exitosamente!');
+          }
+        } catch (err) {
+          alert('Error al leer el archivo JSON.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    render();
+  </script>
+</body>
+</html>
