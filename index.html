@@ -179,7 +179,16 @@
 
       <!-- Formulario de Registro -->
       <form id="communityForm" onsubmit="saveCommunity(event)">
-        <h2 style="font-size: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 10px;">Registrar Comunidad</h2>
+        <h2 id="formTitle" style="font-size: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 10px;">Registrar Comunidad</h2>
+
+        <div id="editAlert" style="display:none; background:#fef3c7; color:#92400e; padding:8px 12px; border-radius:6px; font-size:0.8rem; margin-bottom:10px; font-weight:600; justify-content:space-between; align-items:center;">
+          <span>✏️ Editando registro</span>
+          <button type="button" onclick="cancelEdit()" style="background:none; border:none; color:#b45309; cursor:pointer; font-weight:bold; text-decoration:underline;">Cancelar</button>
+        </div>
+        <input type="hidden" id="editOriginalNombre">
+        <input type="hidden" id="editOriginalLat">
+        <input type="hidden" id="editOriginalLng">
+
         
         <div class="grid-2">
           <div class="form-group">
@@ -276,7 +285,7 @@
           <textarea id="observaciones" rows="2" placeholder="Caminos de tierra, ríos crecidos, vehículos 4x4..."></textarea>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">Guardar Comunidad</button>
+        <button type="submit" id="btnSubmitForm" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">Guardar Comunidad</button>
       </form>
 
       <h3 style="font-size: 0.95rem; margin-top: 10px;">Comunidades Registradas</h3>
@@ -597,9 +606,11 @@
           <b>Enfermos:</b> N:${c.ninosEnfermos} | A:${c.adultosEnfermos} | M:${c.mayoresEnfermos}<br>
           <b>Mascotas:</b> 🐕 ${c.perros} | 🐈 ${c.gatos}<br>
           <b>Necesitan:</b> ${c.insumos.join(', ') || 'No especificado'}<br>
-          <div style="margin-top: 8px; display: flex; gap: 6px;">
-            <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-primary">🚗 Cómo llegar</a>
-            <button onclick="deleteCommunity(${index})" class="btn btn-sm btn-danger">Eliminar</button>
+          <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap:wrap;">
+            <a href="${gmapsUrl}" target="_blank" class="btn btn-sm btn-primary">🚗 Llegar</a>
+            <button onclick="editCommunity(${index})" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1;">✏️ Editar</button>
+            <button onclick="toggleEstado(${index})" class="btn btn-sm btn-primary">Estado</button>
+            <button onclick="deleteCommunity(${index})" class="btn btn-sm btn-danger">🗑️</button>
           </div>
         `);
         markersLayer.addLayer(marker);
@@ -618,9 +629,10 @@
           <p><strong>Total:</strong> ${c.total} pers. (Infantes: ${Number(c.bebes)+Number(c.ninos)}, Mayores: ${c.mayores})</p>
           <p><strong>Necesidades:</strong> ${c.insumos.join(', ') || 'Sin insumos marcados'}</p>
           <p><strong>Contacto:</strong> ${c.contacto || 'Sin contacto'}</p>
-          <div style="display:flex; justify-content:space-between; margin-top:6px; gap:4px;">
+          <div style="display:flex; justify-content:space-between; margin-top:6px; gap:4px; flex-wrap:wrap;">
             <a href="${gmapsUrl}" target="_blank" class="btn btn-sm" style="border:1px solid #d1d5db;">📍 GPS</a>
-            <button onclick="toggleEstado(${index})" class="btn btn-sm btn-primary">Cambiar Estado</button>
+            <button onclick="editCommunity(${index})" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">✏️ Editar</button>
+            <button onclick="toggleEstado(${index})" class="btn btn-sm btn-primary">Estado</button>
             <button onclick="deleteCommunity(${index})" class="btn btn-sm btn-danger">🗑️</button>
           </div>
         `;
@@ -634,6 +646,71 @@
 
       localStorage.setItem('rotary_communities', JSON.stringify(communities));
       updateSyncUI(syncQueue.length === 0 ? '🟢 Todo sincronizado con Google Drive.' : `🟡 ${syncQueue.length} pendiente(s) por sincronizar.`);
+    }
+
+
+    let editingIndex = -1;
+
+    function editCommunity(index) {
+      editingIndex = index;
+      const c = communities[index];
+
+      document.getElementById('formTitle').innerText = "Editar Comunidad";
+      document.getElementById('editAlert').style.display = 'flex';
+      document.getElementById('btnSubmitForm').innerText = "💾 Guardar Cambios en Excel";
+      document.getElementById('btnSubmitForm').style.backgroundColor = "#d97706";
+
+      document.getElementById('editOriginalNombre').value = c.nombre;
+      document.getElementById('editOriginalLat').value = c.lat;
+      document.getElementById('editOriginalLng').value = c.lng;
+
+      document.getElementById('brigadista').value = c.brigadista || '';
+      document.getElementById('nombre').value = c.nombre || '';
+      document.getElementById('estado').value = c.estado || 'Pendiente';
+      document.getElementById('contacto').value = c.contacto || '';
+      document.getElementById('plusCode').value = c.plusCode || '';
+      
+      document.getElementById('bebes').value = c.bebes || 0;
+      document.getElementById('ninos').value = c.ninos || 0;
+      document.getElementById('adultos').value = c.adultos || 0;
+      document.getElementById('mayores').value = c.mayores || 0;
+      calcTotal();
+
+      document.getElementById('ninosEnfermos').value = c.ninosEnfermos || 0;
+      document.getElementById('adultosEnfermos').value = c.adultosEnfermos || 0;
+      document.getElementById('mayoresEnfermos').value = c.mayoresEnfermos || 0;
+      document.getElementById('perros').value = c.perros || 0;
+      document.getElementById('gatos').value = c.gatos || 0;
+
+      const ins = c.insumos || [];
+      document.getElementById('insumoAlimento').checked = ins.includes('Alimento');
+      document.getElementById('insumoLimpieza').checked = ins.includes('Limpieza');
+      document.getElementById('insumoAseo').checked = ins.includes('Aseo');
+      document.getElementById('insumoCarpas').checked = ins.includes('Carpas/Toldas');
+      document.getElementById('insumoCamping').checked = ins.includes('Camping');
+      document.getElementById('insumoColchones').checked = ins.includes('Colchones/Palets');
+
+      document.getElementById('observaciones').value = c.observaciones || '';
+      setLocation(c.lat, c.lng, c.plusCode || '');
+      map.setView([c.lat, c.lng], 16);
+
+      // Desplazar al formulario en pantallas móviles
+      document.querySelector('.sidebar').scrollTop = 0;
+    }
+
+    function cancelEdit() {
+      editingIndex = -1;
+      document.getElementById('formTitle').innerText = "Registrar Comunidad";
+      document.getElementById('editAlert').style.display = 'none';
+      document.getElementById('btnSubmitForm').innerText = "Guardar Comunidad";
+      document.getElementById('btnSubmitForm').style.backgroundColor = "var(--primary)";
+      document.getElementById('communityForm').reset();
+      calcTotal();
+      document.getElementById('lat').value = '';
+      document.getElementById('lng').value = '';
+      document.getElementById('locStatus').className = 'loc-status empty';
+      document.getElementById('locStatus').innerHTML = '⚠️ Aún no has fijado la ubicación';
+      if (tempMarker) map.removeLayer(tempMarker);
     }
 
     function saveCommunity(e) {
@@ -656,6 +733,10 @@
       if (document.getElementById('insumoColchones').checked) insumos.push('Colchones/Palets');
 
       const data = {
+        action: editingIndex >= 0 ? 'update' : 'insert',
+        originalNombre: editingIndex >= 0 ? document.getElementById('editOriginalNombre').value : document.getElementById('nombre').value.trim(),
+        originalLat: editingIndex >= 0 ? parseFloat(document.getElementById('editOriginalLat').value) : parseFloat(lat),
+        originalLng: editingIndex >= 0 ? parseFloat(document.getElementById('editOriginalLng').value) : parseFloat(lng),
         brigadista: document.getElementById('brigadista').value.trim() || 'Voluntario',
         nombre: document.getElementById('nombre').value.trim(),
         estado: document.getElementById('estado').value,
@@ -680,21 +761,19 @@
         observaciones: document.getElementById('observaciones').value.trim()
       };
 
-      communities.push(data);
+      if (editingIndex >= 0) {
+        communities[editingIndex] = data;
+        editingIndex = -1;
+      } else {
+        communities.push(data);
+      }
       render();
 
       syncQueue.push(data);
       localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
-      
       attemptSync();
 
-      document.getElementById('communityForm').reset();
-      calcTotal();
-      document.getElementById('lat').value = '';
-      document.getElementById('lng').value = '';
-      document.getElementById('locStatus').className = 'loc-status empty';
-      document.getElementById('locStatus').innerHTML = '⚠️ Aún no has fijado la ubicación';
-      if (tempMarker) map.removeLayer(tempMarker);
+      cancelEdit();
     }
 
     function deleteCommunity(index) {
@@ -706,10 +785,26 @@
 
     function toggleEstado(index) {
       const actual = communities[index].estado;
-      if (actual === 'Pendiente') communities[index].estado = 'Atendido';
-      else if (actual === 'Atendido') communities[index].estado = 'No Viable';
-      else communities[index].estado = 'Pendiente';
+      let nuevo = 'Pendiente';
+      if (actual === 'Pendiente') nuevo = 'Atendido';
+      else if (actual === 'Atendido') nuevo = 'No Viable';
+      communities[index].estado = nuevo;
       render();
+
+      // Enviar actualización de estado inmediatamente a Google Sheets
+      const c = communities[index];
+      const updateData = {
+        action: 'update',
+        originalNombre: c.nombre,
+        originalLat: c.lat,
+        originalLng: c.lng,
+        ...c,
+        estado: nuevo
+      };
+
+      syncQueue.push(updateData);
+      localStorage.setItem('rotary_sync_queue', JSON.stringify(syncQueue));
+      attemptSync();
     }
 
     function exportDataJSON() {
