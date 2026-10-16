@@ -88,24 +88,30 @@
       }
     }
 
-    /* Cabecera Rotary con proporción original protegida */
+    /* Cabecera Limpia (Tipográfica sin imágenes propensas a deformación) */
     .rotary-header {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 12px;
       border-bottom: 2px solid #f1f5f9;
       padding-bottom: 10px;
     }
-    .rotary-logo-img {
-      height: 46px;
-      width: auto;
-      max-width: 130px;
-      object-fit: contain;
+    .rotary-icon-badge {
+      background: #e0004d;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
       flex-shrink: 0;
     }
     .rotary-title {
-      font-size: 19px;
+      font-size: 20px;
       font-weight: 800;
       color: #0f172a;
       letter-spacing: -0.5px;
@@ -511,9 +517,9 @@
     <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
     <div id="sidebarPanel" class="sidebar-panel">
       
-      <!-- Cabecera con Logo Nítido y Proporcional -->
+      <!-- Cabecera Limpia sin imagen para evitar deformaciones -->
       <div class="rotary-header">
-        <img class="rotary-logo-img" src="toppng.com-rotaract-logo-2000x865.png" alt="Rotaract Logo" onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 80\'><text x=\'10\' y=\'50\' font-family=\'Arial\' font-size=\'32\' font-weight=\'bold\' fill=\'%23E0004D\'>Rotaract</text></svg>'" />
+        <div class="rotary-icon-badge">⚙️</div>
         <div>
           <h1 class="rotary-title">Brigada <span>Rotary</span></h1>
           <p style="font-size: 11px; color: #64748b; font-weight: 600;">Censo y Auxilio en Emergencias</p>
@@ -693,7 +699,7 @@
           <span class="yn-title">Kit de Alimentos</span>
           <div class="yn-toggles">
             <button type="button" class="yn-btn yes active" onclick="setYN('necFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('necFood', false, this)">NO</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('necFood', false, this)">NO</button>
             <input type="hidden" id="necFood" value="false" />
           </div>
         </div>
@@ -702,7 +708,7 @@
           <span class="yn-title">Kit de Higiene</span>
           <div class="yn-toggles">
             <button type="button" class="yn-btn yes active" onclick="setYN('necHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('necHygiene', false, this)">NO</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('necHygiene', false, this)">NO</button>
             <input type="hidden" id="necHygiene" value="false" />
           </div>
         </div>
@@ -1021,8 +1027,8 @@
       for (let z = 8; z <= 12; z++) {
         const xMin = lon2tile(minLon, z);
         const xMax = lon2tile(maxLon, z);
-        const yMin = lat2tile(maxLat, z);
-        const yMax = lat2tile(minLat, z);
+        yMin = lat2tile(maxLat, z);
+        yMax = lat2tile(minLat, z);
 
         for (let x = xMin; x <= xMax; x++) {
           for (let y = yMin; y <= yMax; y++) {
@@ -1266,7 +1272,7 @@
     };
 
     // =========================================================================
-    // MARCADORES Y POPUPS CON CÓDIGO DE COLOR
+    // MARCADORES Y POPUPS CON CÓDIGO DE COLOR (SINCRONIZACIÓN GLOBAL)
     // =========================================================================
     async function refreshMapAndBadges() {
       if (!map) return;
@@ -1320,11 +1326,33 @@
       });
     }
 
+    // DESCARGA DE REPORTES GLOBALES PARA QUE TODOS VEAN LOS PUNTOS DE TODOS
+    async function fetchGlobalReports() {
+      if (!navigator.onLine) return;
+      try {
+        const res = await fetch(WEBHOOK_URL);
+        const data = await res.json();
+        if (data && Array.isArray(data)) {
+          for (const item of data) {
+            item.syncStatus = 'SYNCED';
+            await StorageService.saveReport(item);
+          }
+          await refreshMapAndBadges();
+        }
+      } catch (err) {
+        console.log('Esperando conexión para descarga global de reportes.');
+      }
+    }
+
+    // SUBIDA AUTOMÁTICA EN SEGUNDO PLANO
     let isSyncing = false;
     async function triggerSync() {
       if (!navigator.onLine || isSyncing) return;
       const pending = await StorageService.getPendingReports();
-      if (pending.length === 0) return;
+      if (pending.length === 0) {
+        await fetchGlobalReports();
+        return;
+      }
 
       isSyncing = true;
       try {
@@ -1337,8 +1365,9 @@
 
         await StorageService.markAsSynced(pending.map(p => p.id));
         await refreshMapAndBadges();
+        await fetchGlobalReports();
       } catch (err) {
-        console.warn('Fallo sync:', err);
+        console.warn('Fallo sync, se mantendrán en cola local:', err);
       } finally {
         isSyncing = false;
       }
