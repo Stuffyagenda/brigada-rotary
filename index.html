@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Brigadas de Emergencia</title>
-  <meta name="theme-color" content="#0284c7" />
+  <title>Brigada Rotary - Emergencias</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#e0004d" />
+  <link rel="apple-touch-icon" href="manifest.json" />
 
   <!-- Leaflet CDN -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -28,8 +30,10 @@
       height: 100vh;
       width: 100vw;
       overflow: hidden;
+      position: relative;
     }
 
+    /* Panel Izquierdo: Formulario Colapsable */
     .sidebar-panel {
       width: 490px;
       min-width: 380px;
@@ -41,8 +45,18 @@
       z-index: 10;
       display: flex;
       flex-direction: column;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    .sidebar-panel.collapsed {
+      transform: translateX(-100%);
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    /* Panel Derecho: Mapa */
     .map-panel {
       flex: 1;
       height: 100%;
@@ -61,20 +75,69 @@
       }
       .sidebar-panel {
         width: 100%;
-        height: 55%;
+        height: 60%;
         border-radius: 20px 20px 0 0;
+      }
+      .sidebar-panel.collapsed {
+        transform: translateY(100%);
+        height: 0;
+        padding: 0;
       }
       .map-panel {
         width: 100%;
-        height: 45%;
+        height: 100%;
       }
+    }
+
+    /* Cabecera Rotary */
+    .rotary-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 8px;
+    }
+    .rotary-logo {
+      height: 38px;
+      max-width: 150px;
+      object-fit: contain;
+    }
+    .rotary-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .rotary-title span {
+      color: #e0004d;
+    }
+
+    /* Botón flotante para Alternar Formulario */
+    .btn-toggle-form {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1100;
+      background: #0f172a;
+      color: white;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     /* Barra Superior del Mapa */
     .map-top-bar {
       position: absolute;
       top: 10px;
-      left: 10px;
+      left: 160px;
       right: 10px;
       z-index: 1000;
       display: flex;
@@ -82,6 +145,13 @@
       gap: 6px;
       pointer-events: none;
     }
+    @media (max-width: 900px) {
+      .map-top-bar {
+        left: 10px;
+        top: 50px;
+      }
+    }
+
     .badge-group {
       display: flex;
       flex-wrap: wrap;
@@ -111,13 +181,14 @@
       pointer-events: auto;
     }
 
+    /* Barra de Búsqueda Mixta (Plus Code o Nombre de Comunidad) */
     .search-layer-bar {
       display: flex;
       gap: 6px;
-      max-width: 440px;
+      max-width: 480px;
       pointer-events: auto;
     }
-    .input-pluscode {
+    .input-search {
       flex: 1;
       padding: 7px 10px;
       border: 1px solid #cbd5e1;
@@ -126,7 +197,6 @@
       background: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
       font-weight: 600;
-      text-transform: uppercase;
     }
     .btn-action {
       padding: 7px 12px;
@@ -206,7 +276,7 @@
       color: white;
     }
 
-    /* Formulario */
+    /* Secciones del Formulario */
     .section-title {
       font-size: 12px;
       font-weight: 800;
@@ -359,6 +429,7 @@
       border-color: #0284c7;
     }
 
+    /* Caja de Foto con dos botones (Tomar o Cargar) */
     .photo-box {
       border: 2px dashed #cbd5e1;
       border-radius: 10px;
@@ -366,6 +437,11 @@
       text-align: center;
       background: #f8fafc;
       margin-bottom: 12px;
+    }
+    .photo-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
     }
     .photo-preview {
       width: 100%;
@@ -395,16 +471,15 @@
       padding: 14px;
       border: none;
       border-radius: 10px;
-      background: #0284c7;
+      background: #e0004d;
       color: white;
       font-weight: 700;
       font-size: 16px;
       cursor: pointer;
       margin-top: 15px;
-      box-shadow: 0 4px 10px rgba(2,132,199,0.3);
+      box-shadow: 0 4px 10px rgba(224,0,77,0.3);
     }
 
-    /* Estilos del Popup en el Mapa */
     .popup-card {
       font-size: 13px;
       line-height: 1.4;
@@ -425,13 +500,35 @@
 </head>
 <body>
 
+  <!-- BOTÓN FLOTANTE PARA OCULTAR O MOSTRAR EL FORMULARIO -->
+  <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
+    📋 <span id="toggleFormText">Ocultar Formulario</span>
+  </button>
+
   <div class="app-layout">
 
-    <!-- PANEL IZQUIERDO: FORMULARIO REACTIVO (TODOS EN 0 Y NO) -->
-    <div class="sidebar-panel">
-      <h2 id="formTitle" style="font-size: 18px; color: #0f172a; margin-bottom: 4px;">Levantamiento de Auxilio</h2>
-      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Haz clic en el mapa para fijar coordenadas o usa GPS.</p>
+    <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
+    <div id="sidebarPanel" class="sidebar-panel">
       
+      <!-- Encabezado con Logo Oficial Rotaract -->
+      <div class="rotary-header">
+        <svg class="rotary-logo" viewBox="0 0 835 361" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <text x="10" y="250" font-family="Arial, Helvetica, sans-serif" font-size="200" font-weight="bold" fill="#E0004D">Rotaract</text>
+          <g transform="translate(620, 20) scale(0.9)">
+            <circle cx="170" cy="170" r="140" fill="#E0004D"/>
+            <circle cx="170" cy="170" r="110" fill="white"/>
+            <circle cx="170" cy="170" r="40" fill="#E0004D"/>
+            <path d="M170 30 L170 310 M30 170 L310 170 M71 71 L269 269 M71 269 L269 71" stroke="#E0004D" stroke-width="24"/>
+            <text x="170" y="80" text-anchor="middle" font-family="Arial" font-size="28" font-weight="bold" fill="#E0004D">ROTARY</text>
+            <text x="170" y="280" text-anchor="middle" font-family="Arial" font-size="20" font-weight="bold" fill="#E0004D">INTERNATIONAL</text>
+          </g>
+        </svg>
+        <div>
+          <h1 class="rotary-title">Brigada <span>Rotary</span></h1>
+          <p style="font-size: 11px; color: #64748b; font-weight: 600;">Censo y Auxilio en Emergencias</p>
+        </div>
+      </div>
+
       <input type="hidden" id="reportId" />
       <input type="hidden" id="createdAt" />
       <input type="hidden" id="attendedAt" />
@@ -441,7 +538,7 @@
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
-      <!-- Control y Evaluación -->
+      <!-- Control y Ubicación -->
       <div class="section-title title-blue">Ubicación y Evaluación</div>
       <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
@@ -474,12 +571,22 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <label class="form-label">Foto de Vivienda / Daño (Opcional)</label>
+      <!-- FOTO: Opciones Separadas para Tomar o Cargar -->
+      <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
-        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
-        <button type="button" class="btn-action" style="background:#475569;" onclick="document.getElementById('photoInput').click()">
-          📷 Tomar / Adjuntar Foto
-        </button>
+        <!-- Input para Tomar Foto con la Cámara -->
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
+        <!-- Input para Cargar Foto de Galería / Archivo -->
+        <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)" />
+
+        <div class="photo-actions">
+          <button type="button" class="btn-action" style="background:#e0004d;" onclick="document.getElementById('cameraInput').click()">
+            📷 Tomar Foto
+          </button>
+          <button type="button" class="btn-action" style="background:#475569;" onclick="document.getElementById('galleryInput').click()">
+            📁 Cargar Foto
+          </button>
+        </div>
         <img id="photoPreviewImg" class="photo-preview" />
         <div id="photoStatusText" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
       </div>
@@ -540,6 +647,7 @@
         </div>
       </div>
 
+      <!-- Casos Médicos (Reactivo: solo se despliega si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -579,7 +687,7 @@
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Visible por defecto en PENDIENTE; con check en ATENDIDO) -->
+      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
       <div id="sectionNeeds">
         <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
 
@@ -656,19 +764,19 @@
         </div>
       </div>
 
-      <!-- INTERRUPTOR: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
+      <!-- INTERRUPTOR SIMÉTRICO: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
       <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
         <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
       </div>
 
-      <!-- INTERRUPTOR: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
+      <!-- INTERRUPTOR SIMÉTRICO: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
       <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
         <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Visible por defecto en ATENDIDO; con check en PENDIENTE) -->
+      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
       <div id="sectionDeliveries" style="display: none;">
         <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
 
@@ -763,9 +871,10 @@
           <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Provincias Centrales</span>
         </div>
 
+        <!-- Buscador Inteligente: Acepta Plus Code o Nombres de Comunidades de Panamá -->
         <div class="search-layer-bar">
-          <input type="text" id="plusCodeSearchInput" class="input-pluscode" placeholder="Buscar Plus Code..." />
-          <button type="button" class="btn-action" onclick="searchPlusCode()">Ir</button>
+          <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas, Penonomé...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
+          <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
           <div class="layer-selector">
             <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
             <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
@@ -794,17 +903,39 @@
     // =========================================================================
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
-    // REGISTRO DEL SERVICE WORKER
+    // REGISTRO DEL SERVICE WORKER OFFLINE
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(() => console.log('SW activo y caché listo'))
+          .then(() => console.log('SW activo para modo offline'))
           .catch((err) => console.warn('Aviso SW:', err));
       });
     }
 
     // =========================================================================
-    // OPEN LOCATION CODE (PLUS CODE) OFFLINE
+    // ÍNDICE LOCAL OFFLINE DE COMUNIDADES DE PROVINCIAS CENTRALES (PANAMÁ)
+    // =========================================================================
+    const LOCAL_PANAMA_PLACES = {
+      // HERRERA
+      "CHITRE": [7.9625, -80.4286], "LA ARENA": [7.9714, -80.4571], "MONAGRILLO": [7.9856, -80.4189],
+      "LLANO BONITO": [7.9442, -80.4411], "PARITA": [8.0028, -80.5206], "PESE": [7.8967, -80.6189],
+      "OCU": [7.9347, -80.7761], "LOS POZOS": [7.8183, -80.6656], "SANTA MARIA": [8.1158, -80.6681], "LAS MINAS": [7.7972, -80.7519],
+      // LOS SANTOS
+      "LAS TABLAS": [7.7667, -80.2833], "LOS SANTOS": [7.9333, -80.4167], "GUARARE": [7.8167, -80.2833],
+      "PEDASI": [7.5333, -80.0333], "PLAYA VENAO": [7.4289, -80.1981], "TONOSI": [7.3500, -80.4333],
+      "MACARACAS": [7.7333, -80.5333], "POCHETI": [7.7011, -80.4890],
+      // VERAGUAS
+      "SANTIAGO": [8.1000, -80.9833], "ATALAYA": [8.0500, -80.9333], "CANAZAS": [8.3167, -81.2167],
+      "SAN FRANCISCO": [8.2500, -80.9667], "SANTA FE": [8.5167, -81.0833], "MONTIJO": [7.9833, -81.0500],
+      "SONA": [8.0167, -81.3167], "RIO DE JESUS": [7.9833, -81.1667], "CALOBRE": [8.3167, -80.8667],
+      "LA MESA": [8.1500, -81.1833], "MARIATO": [7.6333, -81.0333],
+      // COCLE
+      "PENONOME": [8.5167, -80.3500], "AGUADULCE": [8.2500, -80.5500], "ANTON": [8.4000, -80.2667],
+      "EL VALLE": [8.6000, -80.1333], "NATA": [8.3333, -80.5167], "OLA": [8.4167, -80.6500], "RIO HATO": [8.3833, -80.1667]
+    };
+
+    // =========================================================================
+    // OPEN LOCATION CODE (PLUS CODE)
     // =========================================================================
     const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
 
@@ -866,7 +997,19 @@
     }
 
     // =========================================================================
-    // 1. DESCARGA OFFLINE DE MOSAICOS (Herrera, Los Santos, Veraguas, Coclé)
+    // CONTROL DE VISIBILIDAD DEL FORMULARIO (BOTÓN FLOTANTE)
+    // =========================================================================
+    window.toggleFormVisibility = () => {
+      const panel = document.getElementById('sidebarPanel');
+      const text = document.getElementById('toggleFormText');
+      panel.classList.toggle('collapsed');
+      const isCollapsed = panel.classList.contains('collapsed');
+      text.textContent = isCollapsed ? 'Ver Formulario' : 'Ocultar Formulario';
+      setTimeout(() => { map.invalidateSize(); }, 350);
+    };
+
+    // =========================================================================
+    // DESCARGA OFFLINE DE MOSAICOS
     // =========================================================================
     function lon2tile(lon, zoom) {
       return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom));
@@ -878,16 +1021,14 @@
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
-        alert('Debes tener conexión a internet activa para descargar el mapa de la región.');
+        alert('Se requiere conexión a internet para descargar el mapa regional.');
         return;
       }
 
-      btn.textContent = '⏳ Descargando región...';
-      // Delimitación de Provincias Centrales: Herrera, Los Santos, Veraguas, Coclé
+      btn.textContent = '⏳ Descargando...';
       const minLat = 7.2, minLon = -81.8, maxLat = 8.9, maxLon = -80.0;
       const tileUrls = [];
 
-      // Descarga de niveles de zoom 8 al 12 (vista provincial y carreteras principales)
       for (let z = 8; z <= 12; z++) {
         const xMin = lon2tile(minLon, z);
         const xMax = lon2tile(maxLon, z);
@@ -914,11 +1055,11 @@
           } catch (e) {}
           done++;
           if (done % 50 === 0) {
-            btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}% descargado`;
+            btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}%`;
           }
         }
         btn.textContent = '✅ Provincias Centrales Listas';
-        alert('¡Mapa de Herrera, Los Santos, Veraguas y Coclé guardado con éxito! Podrás navegarlo sin señal.');
+        alert('¡Mapa de Herrera, Los Santos, Veraguas y Coclé guardado con éxito!');
       } catch (err) {
         btn.textContent = '❌ Error de descarga';
         alert('Error descargando mapa: ' + err.message);
@@ -926,10 +1067,10 @@
     };
 
     // =========================================================================
-    // 2. CAPA DE ALMACENAMIENTO ASÍNCRONO (IndexedDB)
+    // ALMACENAMIENTO ASÍNCRONO (IndexedDB)
     // =========================================================================
     const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 10;
+    const DB_VERSION = 11;
     const STORE_NAME = 'reports';
 
     function openDatabase() {
@@ -1004,7 +1145,7 @@
     };
 
     // =========================================================================
-    // 3. MAPA LEAFLET Y MARCADORES CON CÓDIGO DE COLOR (ROJO / VERDE)
+    // MAPA LEAFLET Y BÚSQUEDA INTELIGENTE
     // =========================================================================
     let map;
     let streetLayer;
@@ -1014,15 +1155,9 @@
     let currentMarker = null;
 
     function initMap() {
-      streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-      });
+      streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+      satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
 
-      satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
-      });
-
-      // Centro en Provincias Centrales (Aprox. Chitré / Divisa)
       map = L.map('map', {
         zoomControl: false,
         attributionControl: false,
@@ -1047,10 +1182,14 @@
       document.getElementById('plusCode').value = code;
       document.getElementById('plusCodeDisplay').textContent = code;
 
-      if (currentMarker) {
-        map.removeLayer(currentMarker);
-      }
+      if (currentMarker) map.removeLayer(currentMarker);
       currentMarker = L.marker([lat, lng]).addTo(map);
+
+      // Si el formulario estaba colapsado en móvil, avisar sutilmente
+      const panel = document.getElementById('sidebarPanel');
+      if (panel.classList.contains('collapsed')) {
+        document.getElementById('toggleFormText').textContent = 'Ver Formulario (Punto fijado)';
+      }
     }
 
     window.switchLayer = (type) => {
@@ -1085,17 +1224,45 @@
       );
     };
 
-    window.searchPlusCode = () => {
-      const codeInput = document.getElementById('plusCodeSearchInput').value.trim();
-      if (!codeInput) return;
+    // Búsqueda Inteligente: Plus Code o Nombre de Comunidad
+    window.handleSmartSearch = async () => {
+      const term = document.getElementById('smartSearchInput').value.trim();
+      if (!term) return;
 
-      const coords = decodePlusCode(codeInput);
+      // 1. Intentar decodificar como Plus Code
+      const coords = decodePlusCode(term);
       if (coords) {
         map.setView([coords.lat, coords.lng], 17);
         setLocationInForm(coords.lat, coords.lng);
-      } else {
-        alert('Plus Code no válido. Debe tener mínimo 8 caracteres (ej: 764R6FW7+C8).');
+        return;
       }
+
+      // 2. Buscar en el índice local offline de Provincias Centrales
+      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      for (const [name, coord] of Object.entries(LOCAL_PANAMA_PLACES)) {
+        if (name.includes(upperTerm) || upperTerm.includes(name)) {
+          map.setView(coord, 15);
+          setLocationInForm(coord[0], coord[1]);
+          return;
+        }
+      }
+
+      // 3. Fallback online con Nominatim enfocado en Panamá si hay internet
+      if (navigator.onLine) {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=pa&q=${encodeURIComponent(term)}`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            map.setView([lat, lon], 15);
+            setLocationInForm(lat, lon);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      alert('No se encontró la ubicación. Intenta con un Plus Code o nombre de comunidad (ej: Chitré, Las Tablas, Penonomé, Pesé).');
     };
 
     window.setFilter = (filter, ev) => {
@@ -1115,7 +1282,7 @@
     };
 
     // =========================================================================
-    // 4. ACTUALIZACIÓN VISUAL DEL MAPA (ROJO PENDIENTES / VERDE ATENDIDOS)
+    // MARCADORES Y POPUPS CON CÓDIGO DE COLOR
     // =========================================================================
     async function refreshMapAndBadges() {
       if (!map) return;
@@ -1132,7 +1299,6 @@
 
       allReports.forEach(r => {
         const isAttended = r.status === 'ATENDIDO';
-        // Rojo para pendiente (#dc2626) y Verde para atendido (#16a34a)
         const markerColor = isAttended ? '#16a34a' : '#dc2626';
 
         const marker = L.circleMarker([r.lat, r.lng], {
@@ -1143,7 +1309,6 @@
           fillOpacity: 0.95
         });
 
-        // Popup estructurado con tabla de datos esenciales
         marker.bindPopup(`
           <div class="popup-card">
             <span class="popup-badge ${isAttended ? 'popup-attended' : 'popup-pending'}">
@@ -1153,7 +1318,7 @@
             <p><b>Tel:</b> ${r.contactPhone || 'N/A'}</p>
             <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
             <p><b>Daño Casa:</b> ${r.houseDamage}</p>
-            <p><b>Afectados:</b> ${r.totalPeople} personas (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
+            <p><b>Personas:</b> ${r.totalPeople} (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
             ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
@@ -1196,7 +1361,7 @@
     }
 
     // =========================================================================
-    // 5. PROCESAMIENTO Y COMPRESIÓN DE FOTO
+    // PROCESAMIENTO Y COMPRESIÓN DE FOTO
     // =========================================================================
     window.handlePhotoUpload = (e) => {
       const file = e.target.files[0];
@@ -1241,7 +1406,7 @@
     };
 
     // =========================================================================
-    // 6. CONTROL REACTIVO SIMÉTRICO (PENDIENTE / ATENDIDO)
+    // CONTROLES DEL FORMULARIO Y REACTIVIDAD
     // =========================================================================
     window.adjustInput = (id, delta) => {
       const input = document.getElementById(id);
@@ -1285,9 +1450,7 @@
       const minors = parseInt(document.getElementById('minorsCount').value, 10) || 0;
       const total = adults + seniors + minors;
       const headerElem = document.getElementById('totalPeopleHeader');
-      if (headerElem) {
-        headerElem.textContent = `Total: ${total}`;
-      }
+      if (headerElem) headerElem.textContent = `Total: ${total}`;
     };
 
     window.handleStatusChange = () => {
@@ -1296,11 +1459,9 @@
       const boxToggleNeeds = document.getElementById('boxToggleNeeds');
 
       if (status === 'ATENDIDO') {
-        // En ATENDIDO: se oculta el toggle de entrega y se muestra el toggle de necesidades
         boxToggleDeliveries.style.display = 'none';
         boxToggleNeeds.style.display = 'flex';
       } else {
-        // En PENDIENTE: se muestra el toggle de entrega y se oculta el de necesidades
         boxToggleDeliveries.style.display = 'flex';
         boxToggleNeeds.style.display = 'none';
       }
@@ -1322,11 +1483,9 @@
       const sectionDeliveries = document.getElementById('sectionDeliveries');
 
       if (status === 'PENDIENTE') {
-        // Pendiente: Necesidades siempre visibles. Entregas solo si se marca el check.
         sectionNeeds.style.display = 'block';
         sectionDeliveries.style.display = chkDelivered ? 'block' : 'none';
       } else {
-        // Atendido: Entregas siempre visibles. Necesidades solo si se marca el check.
         sectionDeliveries.style.display = 'block';
         sectionNeeds.style.display = chkHasNeeds ? 'block' : 'none';
       }
@@ -1373,13 +1532,16 @@
       });
     }
 
-    // Cargar reporte al tocarlo en el mapa
     window.loadReportToForm = async (id) => {
       const all = await StorageService.getAllReports();
       const report = all.find(item => item.id === id);
       if (!report) return;
 
-      document.getElementById('formTitle').textContent = 'Editar / Actualizar Reporte';
+      // Asegurar que el formulario sea visible
+      const panel = document.getElementById('sidebarPanel');
+      panel.classList.remove('collapsed');
+      document.getElementById('toggleFormText').textContent = 'Ocultar Formulario';
+
       document.getElementById('reportId').value = report.id;
       document.getElementById('createdAt').value = report.createdAt;
       document.getElementById('attendedAt').value = report.attendedAt || '';
@@ -1422,7 +1584,6 @@
       document.getElementById('catsCount').value = report.catsCount ?? 0;
       updateTotalPeople();
 
-      // Necesidades
       updateYNUI('necWater', Boolean(report.necWater));
       updateYNUI('necFood', Boolean(report.necFood));
       updateYNUI('necHygiene', Boolean(report.necHygiene));
@@ -1432,7 +1593,6 @@
       updateYNUI('necColchonetas', Boolean(report.necColchonetas));
       setSelectedChips('necOtherChips', report.necOtherSupplies || '');
 
-      // Entregas
       updateYNUI('entWater', Boolean(report.entWater));
       updateYNUI('entFood', Boolean(report.entFood));
       updateYNUI('entHygiene', Boolean(report.entHygiene));
@@ -1463,7 +1623,6 @@
     };
 
     function resetFormToDefaults() {
-      document.getElementById('formTitle').textContent = 'Levantamiento de Auxilio';
       document.getElementById('reportId').value = '';
       document.getElementById('createdAt').value = '';
       document.getElementById('attendedAt').value = '';
@@ -1478,7 +1637,6 @@
       document.getElementById('contactName').value = '';
       document.getElementById('contactPhone').value = '';
 
-      // Inicializar todo en 0
       document.getElementById('adultsCount').value = 0;
       document.getElementById('seniorsCount').value = 0;
       document.getElementById('minorsCount').value = 0;
@@ -1489,7 +1647,6 @@
       updateTotalPeople();
       updateMedicalChipsVisibility();
 
-      // Inicializar todo en NO
       ['necWater', 'necFood', 'necHygiene', 'necLona', 'necCamping', 'necToldas', 'necColchonetas'].forEach(id => updateYNUI(id, false));
       document.querySelectorAll('#necOtherChips .chip').forEach(c => c.classList.remove('selected'));
 
@@ -1523,7 +1680,6 @@
       const minors = parseInt(document.getElementById('minorsCount').value, 10) || 0;
       const totalPeople = adults + seniors + minors;
 
-      // Lógica simétrica de activación de datos
       const areDeliveriesActive = (status === 'ATENDIDO') || document.getElementById('checkDelivered').checked;
       const areNeedsActive = (status === 'PENDIENTE') || document.getElementById('checkHasNeeds').checked;
 
@@ -1582,7 +1738,7 @@
       };
 
       await StorageService.saveReport(reportData);
-      alert('Reporte guardado con éxito');
+      alert('Reporte guardado con éxito.');
       resetFormToDefaults();
       await refreshMapAndBadges();
       triggerSync();

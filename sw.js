@@ -1,10 +1,11 @@
-// sw.js - Service Worker con Caché de Mosaicos para Provincias Centrales
-const APP_SHELL_CACHE = 'brigadas-shell-v11';
+// sw.js - Service Worker Offline Brigada Rotary
+const APP_SHELL_CACHE = 'brigada-rotary-v12';
 const TILES_CACHE = 'osm-tiles-offline-v1';
 
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './manifest.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
@@ -34,7 +35,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Ignorar peticiones de sincronización con Google Apps Script
+  // No interceptar envíos hacia Google Apps Script
   if (
     e.request.method !== 'GET' ||
     url.hostname.includes('script.google.com') ||
@@ -43,19 +44,18 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Interceptar Mosaicos de OpenStreetMap o ArcGIS Satelital (Cache-First)
+  // Interceptar Mosaicos de OpenStreetMap o ArcGIS Satélite
   if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('arcgisonline.com')) {
     e.respondWith(
       caches.open(TILES_CACHE).then(async (cache) => {
         const cached = await cache.match(e.request);
         if (cached) return cached;
-
         try {
-          const networkResponse = await fetch(e.request);
-          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
-            cache.put(e.request, networkResponse.clone());
+          const res = await fetch(e.request);
+          if (res && (res.status === 200 || res.type === 'opaque')) {
+            cache.put(e.request, res.clone());
           }
-          return networkResponse;
+          return res;
         } catch (err) {
           return new Response('', { status: 408 });
         }
@@ -64,7 +64,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // App Shell y archivos estáticos
+  // App Shell y recursos estáticos
   e.respondWith(
     caches.match(e.request).then((cached) => {
       if (cached) return cached;
