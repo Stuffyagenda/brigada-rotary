@@ -22,7 +22,7 @@
       background-color: #0f172a;
     }
 
-    /* Contenedor Principal: Split Pantalla (Izquierda Formulario, Derecha Mapa) */
+    /* Layout Split: Formulario Izquierda | Mapa Derecha */
     .app-layout {
       display: flex;
       height: 100vh;
@@ -30,10 +30,9 @@
       overflow: hidden;
     }
 
-    /* Panel Izquierdo: Formulario */
     .sidebar-panel {
-      width: 480px;
-      min-width: 360px;
+      width: 490px;
+      min-width: 380px;
       height: 100%;
       background: white;
       overflow-y: auto;
@@ -44,7 +43,6 @@
       flex-direction: column;
     }
 
-    /* Panel Derecho: Mapa */
     .map-panel {
       flex: 1;
       height: 100%;
@@ -57,8 +55,7 @@
       width: 100%;
     }
 
-    /* Responsive: en móviles se apila verticalmente */
-    @media (max-width: 850px) {
+    @media (max-width: 900px) {
       .app-layout {
         flex-direction: column-reverse;
       }
@@ -81,9 +78,8 @@
       right: 10px;
       z-index: 1000;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      gap: 6px;
       pointer-events: none;
     }
     .badge-group {
@@ -109,16 +105,17 @@
     .badge-offline { background-color: #dc2626; }
     .badge-sync { background-color: #0284c7; }
     .badge-stats { background-color: #334155; }
+    .badge-download {
+      background-color: #7c3aed;
+      cursor: pointer;
+      pointer-events: auto;
+    }
 
-    /* Barra de Búsqueda y Capas */
     .search-layer-bar {
-      position: absolute;
-      top: 50px;
-      left: 10px;
-      z-index: 1000;
       display: flex;
       gap: 6px;
-      max-width: 380px;
+      max-width: 440px;
+      pointer-events: auto;
     }
     .input-pluscode {
       flex: 1;
@@ -131,15 +128,16 @@
       font-weight: 600;
       text-transform: uppercase;
     }
-    .btn-search {
+    .btn-action {
       padding: 7px 12px;
       background: #0284c7;
       color: white;
       border: none;
       border-radius: 8px;
       font-weight: 700;
-      font-size: 12px;
+      font-size: 11px;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
     .layer-selector {
       display: flex;
@@ -162,7 +160,6 @@
       color: white;
     }
 
-    /* Botón flotante "Mi Ubicación" */
     .btn-gps {
       position: absolute;
       bottom: 70px;
@@ -182,7 +179,6 @@
       gap: 6px;
     }
 
-    /* Barra Filtros en Mapa */
     .filter-bar {
       position: absolute;
       bottom: 15px;
@@ -210,12 +206,12 @@
       color: white;
     }
 
-    /* Estilos del Formulario */
+    /* Formulario */
     .section-title {
       font-size: 12px;
       font-weight: 800;
       text-transform: uppercase;
-      margin: 16px 0 8px 0;
+      margin: 14px 0 8px 0;
       letter-spacing: 0.5px;
       border-bottom: 2px solid #e2e8f0;
       padding-bottom: 4px;
@@ -251,7 +247,7 @@
       font-weight: 800;
       font-family: monospace;
       font-size: 13px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .row-2 {
       display: grid;
@@ -259,7 +255,6 @@
       gap: 10px;
     }
 
-    /* Contadores con Inputs Editables */
     .counter-row {
       display: flex;
       align-items: center;
@@ -309,12 +304,11 @@
       margin: 0;
     }
 
-    /* Filas SI / NO */
     .yn-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px;
+      padding: 7px 12px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
@@ -342,12 +336,11 @@
     .yn-btn.yes-green.active { background: #16a34a; color: white; border-color: #16a34a; }
     .yn-btn.no.active { background: #64748b; color: white; border-color: #64748b; }
 
-    /* Chips */
     .chip-container {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      margin: 6px 0 12px 0;
+      margin: 6px 0 10px 0;
     }
     .chip {
       padding: 6px 11px;
@@ -383,17 +376,19 @@
       display: none;
     }
 
-    .delivery-toggle-box {
+    .toggle-subbox {
       display: flex;
       align-items: center;
       gap: 10px;
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
       border-radius: 10px;
-      padding: 12px;
-      margin: 14px 0;
+      padding: 10px 12px;
+      margin: 12px 0;
       cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
     }
+    .box-amber { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .box-green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
 
     .btn-submit {
       width: 100%;
@@ -408,29 +403,47 @@
       margin-top: 15px;
       box-shadow: 0 4px 10px rgba(2,132,199,0.3);
     }
+
+    /* Estilos del Popup en el Mapa */
+    .popup-card {
+      font-size: 13px;
+      line-height: 1.4;
+      min-width: 210px;
+    }
+    .popup-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 10px;
+      color: white;
+      margin-bottom: 6px;
+    }
+    .popup-pending { background-color: #dc2626; }
+    .popup-attended { background-color: #16a34a; }
   </style>
 </head>
 <body>
 
   <div class="app-layout">
 
-    <!-- PANEL IZQUIERDO: FORMULARIO SIEMPRE VISIBLE (VALORES EN 0 Y NO) -->
+    <!-- PANEL IZQUIERDO: FORMULARIO REACTIVO (TODOS EN 0 Y NO) -->
     <div class="sidebar-panel">
-      <h2 id="formTitle" style="font-size: 18px; color: #0f172a; margin-bottom: 8px;">Levantamiento de Auxilio</h2>
-      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Toca cualquier punto del mapa para fijar la ubicación.</p>
+      <h2 id="formTitle" style="font-size: 18px; color: #0f172a; margin-bottom: 4px;">Levantamiento de Auxilio</h2>
+      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Haz clic en el mapa para fijar coordenadas o usa GPS.</p>
       
       <input type="hidden" id="reportId" />
       <input type="hidden" id="createdAt" />
       <input type="hidden" id="attendedAt" />
-      <input type="hidden" id="lat" value="8.427" />
-      <input type="hidden" id="lng" value="-80.485" />
+      <input type="hidden" id="lat" value="7.965" />
+      <input type="hidden" id="lng" value="-80.432" />
       <input type="hidden" id="plusCode" value="764R6FW7+C8" />
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
       <!-- Control y Evaluación -->
       <div class="section-title title-blue">Ubicación y Evaluación</div>
-      <div style="margin-bottom: 6px;">
+      <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
         <span id="plusCodeDisplay" class="pluscode-badge">764R6FW7+C8</span>
       </div>
@@ -439,8 +452,8 @@
         <div>
           <label class="form-label">Estado</label>
           <select id="statusSelect" class="form-control" onchange="handleStatusChange()">
-            <option value="PENDIENTE" selected>Pendiente</option>
-            <option value="ATENDIDO">Atendido</option>
+            <option value="PENDIENTE" selected>Pendiente (Rojo)</option>
+            <option value="ATENDIDO">Atendido (Verde)</option>
           </select>
         </div>
         <div>
@@ -461,10 +474,10 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <label class="form-label">Foto de la Vivienda (Opcional)</label>
+      <label class="form-label">Foto de Vivienda / Daño (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
-        <button type="button" class="layer-btn" style="padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px;" onclick="document.getElementById('photoInput').click()">
+        <button type="button" class="btn-action" style="background:#475569;" onclick="document.getElementById('photoInput').click()">
           📷 Tomar / Adjuntar Foto
         </button>
         <img id="photoPreviewImg" class="photo-preview" />
@@ -527,7 +540,6 @@
         </div>
       </div>
 
-      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -567,9 +579,9 @@
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
+      <!-- SECCIÓN NECESIDADES (Visible por defecto en PENDIENTE; con check en ATENDIDO) -->
       <div id="sectionNeeds">
-        <div class="section-title title-amber">Necesidades Requeridas (Todo en NO por defecto)</div>
+        <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
 
         <div class="yn-row">
           <span class="yn-title">Agua Potable</span>
@@ -634,7 +646,7 @@
           </div>
         </div>
 
-        <label class="form-label" style="margin-top: 8px;">Otros Insumos Necesarios (Opcional)</label>
+        <label class="form-label" style="margin-top: 8px;">Otros Insumos Requeridos (Opcional)</label>
         <div class="chip-container" id="necOtherChips">
           <span class="chip" onclick="toggleChip(this)">Palets</span>
           <span class="chip" onclick="toggleChip(this)">Pañales Bebé</span>
@@ -644,17 +656,21 @@
         </div>
       </div>
 
-      <!-- CHECKBOX PARA DESPLEGAR ENTREGAS CUANDO ESTÁ EN PENDIENTE -->
-      <div id="boxToggleDeliveries" class="delivery-toggle-box" onclick="toggleDeliveryCheck()">
-        <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateDeliveriesVisibility();" />
-        <label for="checkDelivered" style="font-size: 13px; font-weight: 700; color: #166534; cursor: pointer;">
-          📦 ¿Se realizó alguna entrega en esta visita?
-        </label>
+      <!-- INTERRUPTOR: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
+      <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
+        <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
+        <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
+      <!-- INTERRUPTOR: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
+      <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
+        <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
+        <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
+      </div>
+
+      <!-- SECCIÓN ENTREGAS REALIZADAS (Visible por defecto en ATENDIDO; con check en PENDIENTE) -->
       <div id="sectionDeliveries" style="display: none;">
-        <div class="section-title title-green">Entregas Realizadas (Todo en NO por defecto)</div>
+        <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
 
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Agua?</span>
@@ -744,29 +760,27 @@
           <span id="syncBadge" class="badge badge-sync">0 pendientes</span>
           <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
           <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
+          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Provincias Centrales</span>
+        </div>
+
+        <div class="search-layer-bar">
+          <input type="text" id="plusCodeSearchInput" class="input-pluscode" placeholder="Buscar Plus Code..." />
+          <button type="button" class="btn-action" onclick="searchPlusCode()">Ir</button>
+          <div class="layer-selector">
+            <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
+            <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
+          </div>
         </div>
       </div>
 
-      <!-- Buscador Plus Code y Selector Satélite -->
-      <div class="search-layer-bar">
-        <input type="text" id="plusCodeSearchInput" class="input-pluscode" placeholder="Buscar Plus Code..." />
-        <button type="button" class="btn-search" onclick="searchPlusCode()">Ir</button>
-        <div class="layer-selector">
-          <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
-          <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
-        </div>
-      </div>
-
-      <!-- Botón Mi Ubicación -->
       <button type="button" class="btn-gps" onclick="goToMyLocation()">
         📍 Mi Ubicación
       </button>
 
-      <!-- Filtros de Capas -->
       <div class="filter-bar">
         <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
-        <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes</button>
-        <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos</button>
+        <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes (Rojo)</button>
+        <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos (Verde)</button>
       </div>
 
       <div id="map"></div>
@@ -780,17 +794,17 @@
     // =========================================================================
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
-    // REGISTRO DEL SERVICE WORKER PARA APERTURA 100% OFFLINE
+    // REGISTRO DEL SERVICE WORKER
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('Service Worker listo para modo offline'))
+          .then(() => console.log('SW activo y caché listo'))
           .catch((err) => console.warn('Aviso SW:', err));
       });
     }
 
     // =========================================================================
-    // ALGORITMO OFFLINE DE OPEN LOCATION CODE (PLUS CODE)
+    // OPEN LOCATION CODE (PLUS CODE) OFFLINE
     // =========================================================================
     const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
 
@@ -852,10 +866,70 @@
     }
 
     // =========================================================================
-    // 1. CAPA DE ALMACENAMIENTO ASÍNCRONO (IndexedDB)
+    // 1. DESCARGA OFFLINE DE MOSAICOS (Herrera, Los Santos, Veraguas, Coclé)
+    // =========================================================================
+    function lon2tile(lon, zoom) {
+      return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom));
+    }
+    function lat2tile(lat, zoom) {
+      return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
+    }
+
+    window.downloadCentralProvincesMap = async () => {
+      const btn = document.getElementById('btnDownloadRegion');
+      if (!navigator.onLine) {
+        alert('Debes tener conexión a internet activa para descargar el mapa de la región.');
+        return;
+      }
+
+      btn.textContent = '⏳ Descargando región...';
+      // Delimitación de Provincias Centrales: Herrera, Los Santos, Veraguas, Coclé
+      const minLat = 7.2, minLon = -81.8, maxLat = 8.9, maxLon = -80.0;
+      const tileUrls = [];
+
+      // Descarga de niveles de zoom 8 al 12 (vista provincial y carreteras principales)
+      for (let z = 8; z <= 12; z++) {
+        const xMin = lon2tile(minLon, z);
+        const xMax = lon2tile(maxLon, z);
+        const yMin = lat2tile(maxLat, z);
+        const yMax = lat2tile(minLat, z);
+
+        for (let x = xMin; x <= xMax; x++) {
+          for (let y = yMin; y <= yMax; y++) {
+            tileUrls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
+          }
+        }
+      }
+
+      try {
+        const cache = await caches.open('osm-tiles-offline-v1');
+        let done = 0;
+        for (const url of tileUrls) {
+          try {
+            const hasMatch = await cache.match(url);
+            if (!hasMatch) {
+              const res = await fetch(url, { mode: 'cors' });
+              if (res.ok) await cache.put(url, res);
+            }
+          } catch (e) {}
+          done++;
+          if (done % 50 === 0) {
+            btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}% descargado`;
+          }
+        }
+        btn.textContent = '✅ Provincias Centrales Listas';
+        alert('¡Mapa de Herrera, Los Santos, Veraguas y Coclé guardado con éxito! Podrás navegarlo sin señal.');
+      } catch (err) {
+        btn.textContent = '❌ Error de descarga';
+        alert('Error descargando mapa: ' + err.message);
+      }
+    };
+
+    // =========================================================================
+    // 2. CAPA DE ALMACENAMIENTO ASÍNCRONO (IndexedDB)
     // =========================================================================
     const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 9;
+    const DB_VERSION = 10;
     const STORE_NAME = 'reports';
 
     function openDatabase() {
@@ -930,7 +1004,7 @@
     };
 
     // =========================================================================
-    // 2. INICIALIZACIÓN DE MAPA (Calles + Satélite, sin controles de zoom)
+    // 3. MAPA LEAFLET Y MARCADORES CON CÓDIGO DE COLOR (ROJO / VERDE)
     // =========================================================================
     let map;
     let streetLayer;
@@ -948,11 +1022,12 @@
         maxZoom: 19
       });
 
+      // Centro en Provincias Centrales (Aprox. Chitré / Divisa)
       map = L.map('map', {
         zoomControl: false,
         attributionControl: false,
         layers: [streetLayer]
-      }).setView([8.427, -80.485], 13);
+      }).setView([7.965, -80.432], 11);
 
       layerPending = L.layerGroup().addTo(map);
       layerAttended = L.layerGroup().addTo(map);
@@ -991,9 +1066,6 @@
       }
     };
 
-    // =========================================================================
-    // 3. MI UBICACIÓN (GPS) Y BÚSQUEDA POR PLUS CODE
-    // =========================================================================
     window.goToMyLocation = () => {
       if (!navigator.geolocation) {
         alert('Geolocalización no soportada.');
@@ -1007,7 +1079,7 @@
           setLocationInForm(lat, lng);
         },
         (err) => {
-          alert('No se pudo obtener ubicación: ' + err.message);
+          alert('No se pudo obtener ubicación GPS: ' + err.message);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
@@ -1043,58 +1115,51 @@
     };
 
     // =========================================================================
-    // 4. CONECTIVIDAD, MÉTRICAS Y SINCRONIZACIÓN
+    // 4. ACTUALIZACIÓN VISUAL DEL MAPA (ROJO PENDIENTES / VERDE ATENDIDOS)
     // =========================================================================
-    const connBadge = document.getElementById('connBadge');
-    const syncBadge = document.getElementById('syncBadge');
-    const placesBadge = document.getElementById('placesBadge');
-    const peopleBadge = document.getElementById('peopleBadge');
-
-    function updateNetworkStatus() {
-      if (navigator.onLine) {
-        connBadge.textContent = 'En línea';
-        connBadge.className = 'badge badge-online';
-        triggerSync();
-      } else {
-        connBadge.textContent = 'Sin conexión';
-        connBadge.className = 'badge badge-offline';
-      }
-    }
-
-    window.addEventListener('online', updateNetworkStatus);
-    window.addEventListener('offline', updateNetworkStatus);
-
     async function refreshMapAndBadges() {
       if (!map) return;
       const allReports = await StorageService.getAllReports();
       const pending = allReports.filter(r => r.syncStatus === 'PENDING');
       
-      syncBadge.textContent = `${pending.length} pendientes`;
-      placesBadge.textContent = `🏠 ${allReports.length} Lugares`;
+      document.getElementById('syncBadge').textContent = `${pending.length} pendientes`;
+      document.getElementById('placesBadge').textContent = `🏠 ${allReports.length} Lugares`;
       const totalPeople = allReports.reduce((sum, r) => sum + (Number(r.totalPeople) || 0), 0);
-      peopleBadge.textContent = `👥 ${totalPeople} Personas`;
+      document.getElementById('peopleBadge').textContent = `👥 ${totalPeople} Personas`;
 
       layerPending.clearLayers();
       layerAttended.clearLayers();
 
       allReports.forEach(r => {
         const isAttended = r.status === 'ATENDIDO';
+        // Rojo para pendiente (#dc2626) y Verde para atendido (#16a34a)
+        const markerColor = isAttended ? '#16a34a' : '#dc2626';
+
         const marker = L.circleMarker([r.lat, r.lng], {
-          radius: 9,
-          fillColor: isAttended ? '#16a34a' : '#dc2626',
+          radius: 10,
+          fillColor: markerColor,
           color: '#ffffff',
           weight: 2,
-          fillOpacity: 0.9
+          fillOpacity: 0.95
         });
 
+        // Popup estructurado con tabla de datos esenciales
         marker.bindPopup(`
-          <div style="font-size:13px; min-width: 180px;">
-            <p><b>Contacto:</b> ${r.contactName || 'No indicado'}</p>
+          <div class="popup-card">
+            <span class="popup-badge ${isAttended ? 'popup-attended' : 'popup-pending'}">
+              ${isAttended ? 'ATENDIDO' : 'PENDIENTE'} - ${r.priority}
+            </span>
+            <p><b>Contacto:</b> ${r.contactName || 'No especificado'}</p>
+            <p><b>Tel:</b> ${r.contactPhone || 'N/A'}</p>
             <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
-            <p><b>Estado:</b> ${r.status}</p>
-            <p><b>Personas:</b> ${r.totalPeople} | <b>Disc:</b> ${r.disabledCount}</p>
+            <p><b>Daño Casa:</b> ${r.houseDamage}</p>
+            <p><b>Afectados:</b> ${r.totalPeople} personas (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
+            ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
+            ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
-            <button style="margin-top:8px; width:100%; padding:6px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">Cargar en Formulario</button>
+            <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
+              📝 Cargar en Formulario
+            </button>
           </div>
         `);
 
@@ -1176,7 +1241,7 @@
     };
 
     // =========================================================================
-    // 6. MANEJO DE CONTADORES NUMÉRICOS Y VISIBILIDAD REACTIVA
+    // 6. CONTROL REACTIVO SIMÉTRICO (PENDIENTE / ATENDIDO)
     // =========================================================================
     window.adjustInput = (id, delta) => {
       const input = document.getElementById(id);
@@ -1227,33 +1292,43 @@
 
     window.handleStatusChange = () => {
       const status = document.getElementById('statusSelect').value;
-      const boxToggle = document.getElementById('boxToggleDeliveries');
-      const sectionDeliveries = document.getElementById('sectionDeliveries');
+      const boxToggleDeliveries = document.getElementById('boxToggleDeliveries');
+      const boxToggleNeeds = document.getElementById('boxToggleNeeds');
 
       if (status === 'ATENDIDO') {
-        boxToggle.style.display = 'none';
-        sectionDeliveries.style.display = 'block';
+        // En ATENDIDO: se oculta el toggle de entrega y se muestra el toggle de necesidades
+        boxToggleDeliveries.style.display = 'none';
+        boxToggleNeeds.style.display = 'flex';
       } else {
-        boxToggle.style.display = 'flex';
-        updateDeliveriesVisibility();
+        // En PENDIENTE: se muestra el toggle de entrega y se oculta el de necesidades
+        boxToggleDeliveries.style.display = 'flex';
+        boxToggleNeeds.style.display = 'none';
       }
+      updateSectionsVisibility();
     };
 
-    window.toggleDeliveryCheck = () => {
-      const chk = document.getElementById('checkDelivered');
+    window.toggleCheck = (chkId) => {
+      const chk = document.getElementById(chkId);
       chk.checked = !chk.checked;
-      updateDeliveriesVisibility();
+      updateSectionsVisibility();
     };
 
-    window.updateDeliveriesVisibility = () => {
+    window.updateSectionsVisibility = () => {
       const status = document.getElementById('statusSelect').value;
-      const chk = document.getElementById('checkDelivered');
+      const chkDelivered = document.getElementById('checkDelivered').checked;
+      const chkHasNeeds = document.getElementById('checkHasNeeds').checked;
+
+      const sectionNeeds = document.getElementById('sectionNeeds');
       const sectionDeliveries = document.getElementById('sectionDeliveries');
 
-      if (status === 'ATENDIDO' || chk.checked) {
-        sectionDeliveries.style.display = 'block';
+      if (status === 'PENDIENTE') {
+        // Pendiente: Necesidades siempre visibles. Entregas solo si se marca el check.
+        sectionNeeds.style.display = 'block';
+        sectionDeliveries.style.display = chkDelivered ? 'block' : 'none';
       } else {
-        sectionDeliveries.style.display = 'none';
+        // Atendido: Entregas siempre visibles. Necesidades solo si se marca el check.
+        sectionDeliveries.style.display = 'block';
+        sectionNeeds.style.display = chkHasNeeds ? 'block' : 'none';
       }
     };
 
@@ -1298,7 +1373,7 @@
       });
     }
 
-    // Cargar reporte existente al formulario al tocar "Cargar en Formulario" en el mapa
+    // Cargar reporte al tocarlo en el mapa
     window.loadReportToForm = async (id) => {
       const all = await StorageService.getAllReports();
       const report = all.find(item => item.id === id);
@@ -1358,13 +1433,6 @@
       setSelectedChips('necOtherChips', report.necOtherSupplies || '');
 
       // Entregas
-      const hasDeliveries = (
-        report.entWater || report.entFood || report.entHygiene || 
-        report.entLona || report.entCamping || report.entToldas || 
-        report.entColchonetas || (report.entOtherSupplies && report.entOtherSupplies.length > 0)
-      );
-      document.getElementById('checkDelivered').checked = Boolean(hasDeliveries);
-
       updateYNUI('entWater', Boolean(report.entWater));
       updateYNUI('entFood', Boolean(report.entFood));
       updateYNUI('entHygiene', Boolean(report.entHygiene));
@@ -1374,6 +1442,20 @@
       updateYNUI('entColchonetas', Boolean(report.entColchonetas));
       setSelectedChips('entOtherChips', report.entOtherSupplies || '');
       document.getElementById('attendedNotes').value = report.attendedNotes || '';
+
+      const hasDeliveries = Boolean(
+        report.entWater || report.entFood || report.entHygiene || 
+        report.entLona || report.entCamping || report.entToldas || 
+        report.entColchonetas || (report.entOtherSupplies && report.entOtherSupplies.length > 0)
+      );
+      document.getElementById('checkDelivered').checked = hasDeliveries;
+
+      const hasNeeds = Boolean(
+        report.necWater || report.necFood || report.necHygiene || 
+        report.necLona || report.necCamping || report.necToldas || 
+        report.necColchonetas || (report.necOtherSupplies && report.necOtherSupplies.length > 0)
+      );
+      document.getElementById('checkHasNeeds').checked = hasNeeds;
 
       handleStatusChange();
       map.setView([report.lat, report.lng], 16);
@@ -1396,7 +1478,7 @@
       document.getElementById('contactName').value = '';
       document.getElementById('contactPhone').value = '';
 
-      // Todo en 0
+      // Inicializar todo en 0
       document.getElementById('adultsCount').value = 0;
       document.getElementById('seniorsCount').value = 0;
       document.getElementById('minorsCount').value = 0;
@@ -1407,11 +1489,13 @@
       updateTotalPeople();
       updateMedicalChipsVisibility();
 
-      // Todo en NO
+      // Inicializar todo en NO
       ['necWater', 'necFood', 'necHygiene', 'necLona', 'necCamping', 'necToldas', 'necColchonetas'].forEach(id => updateYNUI(id, false));
       document.querySelectorAll('#necOtherChips .chip').forEach(c => c.classList.remove('selected'));
 
       document.getElementById('checkDelivered').checked = false;
+      document.getElementById('checkHasNeeds').checked = false;
+
       ['entWater', 'entFood', 'entHygiene', 'entLona', 'entCamping', 'entToldas', 'entColchonetas'].forEach(id => updateYNUI(id, false));
       document.querySelectorAll('#entOtherChips .chip').forEach(c => c.classList.remove('selected'));
       document.getElementById('attendedNotes').value = '';
@@ -1439,7 +1523,10 @@
       const minors = parseInt(document.getElementById('minorsCount').value, 10) || 0;
       const totalPeople = adults + seniors + minors;
 
-      const isDeliveredActive = status === 'ATENDIDO' || document.getElementById('checkDelivered').checked;
+      // Lógica simétrica de activación de datos
+      const areDeliveriesActive = (status === 'ATENDIDO') || document.getElementById('checkDelivered').checked;
+      const areNeedsActive = (status === 'PENDIENTE') || document.getElementById('checkHasNeeds').checked;
+
       const medicalCount = parseInt(document.getElementById('medicalCount').value, 10) || 0;
       const medicalConditions = medicalCount >= 1 ? getSelectedChips('medicalChips') : '';
 
@@ -1471,25 +1558,25 @@
         catsCount: parseInt(document.getElementById('catsCount').value, 10) || 0,
 
         // Necesidades
-        necWater: document.getElementById('necWater').value === 'true',
-        necFood: document.getElementById('necFood').value === 'true',
-        necHygiene: document.getElementById('necHygiene').value === 'true',
-        necLona: document.getElementById('necLona').value === 'true',
-        necCamping: document.getElementById('necCamping').value === 'true',
-        necToldas: document.getElementById('necToldas').value === 'true',
-        necColchonetas: document.getElementById('necColchonetas').value === 'true',
-        necOtherSupplies: getSelectedChips('necOtherChips'),
+        necWater: areNeedsActive && (document.getElementById('necWater').value === 'true'),
+        necFood: areNeedsActive && (document.getElementById('necFood').value === 'true'),
+        necHygiene: areNeedsActive && (document.getElementById('necHygiene').value === 'true'),
+        necLona: areNeedsActive && (document.getElementById('necLona').value === 'true'),
+        necCamping: areNeedsActive && (document.getElementById('necCamping').value === 'true'),
+        necToldas: areNeedsActive && (document.getElementById('necToldas').value === 'true'),
+        necColchonetas: areNeedsActive && (document.getElementById('necColchonetas').value === 'true'),
+        necOtherSupplies: areNeedsActive ? getSelectedChips('necOtherChips') : '',
 
         // Entregas
-        entWater: isDeliveredActive && (document.getElementById('entWater').value === 'true'),
-        entFood: isDeliveredActive && (document.getElementById('entFood').value === 'true'),
-        entHygiene: isDeliveredActive && (document.getElementById('entHygiene').value === 'true'),
-        entLona: isDeliveredActive && (document.getElementById('entLona').value === 'true'),
-        entCamping: isDeliveredActive && (document.getElementById('entCamping').value === 'true'),
-        entToldas: isDeliveredActive && (document.getElementById('entToldas').value === 'true'),
-        entColchonetas: isDeliveredActive && (document.getElementById('entColchonetas').value === 'true'),
-        entOtherSupplies: isDeliveredActive ? getSelectedChips('entOtherChips') : '',
-        attendedNotes: isDeliveredActive ? document.getElementById('attendedNotes').value.trim() : '',
+        entWater: areDeliveriesActive && (document.getElementById('entWater').value === 'true'),
+        entFood: areDeliveriesActive && (document.getElementById('entFood').value === 'true'),
+        entHygiene: areDeliveriesActive && (document.getElementById('entHygiene').value === 'true'),
+        entLona: areDeliveriesActive && (document.getElementById('entLona').value === 'true'),
+        entCamping: areDeliveriesActive && (document.getElementById('entCamping').value === 'true'),
+        entToldas: areDeliveriesActive && (document.getElementById('entToldas').value === 'true'),
+        entColchonetas: areDeliveriesActive && (document.getElementById('entColchonetas').value === 'true'),
+        entOtherSupplies: areDeliveriesActive ? getSelectedChips('entOtherChips') : '',
+        attendedNotes: areDeliveriesActive ? document.getElementById('attendedNotes').value.trim() : '',
 
         syncStatus: 'PENDING'
       };
@@ -1503,7 +1590,24 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
-      updateNetworkStatus();
+      if (navigator.onLine) {
+        document.getElementById('connBadge').textContent = 'En línea';
+        document.getElementById('connBadge').className = 'badge badge-online';
+        triggerSync();
+      } else {
+        document.getElementById('connBadge').textContent = 'Sin conexión';
+        document.getElementById('connBadge').className = 'badge badge-offline';
+      }
+      window.addEventListener('online', () => {
+        document.getElementById('connBadge').textContent = 'En línea';
+        document.getElementById('connBadge').className = 'badge badge-online';
+        triggerSync();
+      });
+      window.addEventListener('offline', () => {
+        document.getElementById('connBadge').textContent = 'Sin conexión';
+        document.getElementById('connBadge').className = 'badge badge-offline';
+      });
+
       const lastBrig = localStorage.getItem('lastBrigadista');
       if (lastBrig) document.getElementById('brigadistaInput').value = lastBrig;
       resetFormToDefaults();

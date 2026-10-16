@@ -1,7 +1,8 @@
-// sw.js - Service Worker Offline para Brigadas
-const CACHE_NAME = 'brigadas-v10-offline';
+// sw.js - Service Worker con Caché de Mosaicos para Provincias Centrales
+const APP_SHELL_CACHE = 'brigadas-shell-v11';
+const TILES_CACHE = 'osm-tiles-offline-v1';
 
-const ASSETS_TO_CACHE = [
+const STATIC_ASSETS = [
   './',
   './index.html',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -10,8 +11,8 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(APP_SHELL_CACHE).then((cache) => {
+      return cache.addAll(STATIC_ASSETS);
     }).then(() => self.skipWaiting())
   );
 });
@@ -21,7 +22,9 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((k) => {
-          if (k !== CACHE_NAME) return caches.delete(k);
+          if (k !== APP_SHELL_CACHE && k !== TILES_CACHE) {
+            return caches.delete(k);
+          }
         })
       );
     }).then(() => self.clients.claim())
@@ -31,7 +34,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Ignorar sincronizaciones hacia Google Apps Script (deben ir directo a la red)
+  // Ignorar peticiones de sincronización con Google Apps Script
   if (
     e.request.method !== 'GET' ||
     url.hostname.includes('script.google.com') ||
@@ -40,21 +43,40 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Cache-First con Network Fallback para recursos y tiles de mapa
+  // Interceptar Mosaicos de OpenStreetMap o ArcGIS Satelital (Cache-First)
+  if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('arcgisonline.com')) {
+    e.respondWith(
+      caches.open(TILES_CACHE).then(async (cache) => {
+        const cached = await cache.match(e.request);
+        if (cached) return cached;
+
+        try {
+          const networkResponse = await fetch(e.request);
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+            cache.put(e.request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (err) {
+          return new Response('', { status: 408 });
+        }
+      })
+    );
+    return;
+  }
+
+  // App Shell y archivos estáticos
   e.respondWith(
     caches.match(e.request).then((cached) => {
       if (cached) return cached;
-
       return fetch(e.request)
         .then((response) => {
           if (response && (response.status === 200 || response.type === 'opaque')) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+            caches.open(APP_SHELL_CACHE).then((cache) => cache.put(e.request, copy));
           }
           return response;
         })
         .catch(() => {
-          // Si no hay red y piden la página principal, servir index.html
           if (e.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
