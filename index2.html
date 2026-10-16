@@ -1,0 +1,328 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Brigadas de Emergencia</title>
+  <meta name="theme-color" content="#0284c7" />
+
+  <!-- Leaflet CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { height: 100%; width: 100%; font-family: system-ui, -apple-system, sans-serif; background-color: #0f172a; }
+    #map { height: 100vh; width: 100vw; z-index: 1; }
+
+    /* Barra Superior */
+    .status-bar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .badge-group {
+      display: flex;
+      gap: 6px;
+      pointer-events: auto;
+    }
+    .badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-online { background-color: #16a34a; }
+    .badge-offline { background-color: #dc2626; }
+    .badge-sync { background-color: #0284c7; }
+
+    /* Barra Inferior de Filtros */
+    .filter-bar {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      background: white;
+      border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+      padding: 4px;
+    }
+    .filter-btn {
+      padding: 8px 18px;
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 20px;
+      cursor: pointer;
+      color: #475569;
+    }
+    .filter-btn.active {
+      background: #0284c7;
+      color: white;
+    }
+
+    /* Modal de Formulario */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(3px);
+      z-index: 2000;
+      display: none;
+      align-items: flex-end;
+    }
+    .modal-content {
+      background: white;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      border-radius: 20px 20px 0 0;
+      padding: 22px 18px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 16px 0 8px 0;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+    .title-blue { color: #0284c7; border-color: #bae6fd; }
+    .title-amber { color: #d97706; border-color: #fde68a; }
+    .title-green { color: #16a34a; border-color: #bbf7d0; }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #f8fafc;
+      font-weight: 600;
+    }
+    .pluscode-badge {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-family: monospace;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .counter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 6px 12px;
+      margin-bottom: 8px;
+    }
+    .counter-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .counter-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .counter-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: white;
+      font-size: 18px;
+      font-weight: bold;
+      color: #0f172a;
+      touch-action: manipulation;
+    }
+    .counter-val {
+      font-size: 16px;
+      font-weight: 800;
+      width: 28px;
+      text-align: center;
+      color: #0284c7;
+    }
+
+    /* Filas SI / NO */
+    .yn-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+    .yn-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .yn-toggles {
+      display: flex;
+      gap: 4px;
+    }
+    .yn-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: white;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .yn-btn.yes.active { background: #d97706; color: white; border-color: #d97706; }
+    .yn-btn.yes-green.active { background: #16a34a; color: white; border-color: #16a34a; }
+    .yn-btn.no.active { background: #64748b; color: white; border-color: #64748b; }
+
+    /* Chips */
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 6px 0 12px 0;
+    }
+    .chip {
+      padding: 6px 11px;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .chip.selected {
+      background: #0284c7;
+      color: white;
+      border-color: #0284c7;
+    }
+
+    /* Caja de Foto */
+    .photo-box {
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      background: #f8fafc;
+      margin-bottom: 12px;
+    }
+    .photo-preview {
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn-submit {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #0284c7;
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      padding: 14px 20px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="status-bar">
+    <div class="badge-group">
+      <span id="connBadge" class="badge badge-online">En línea</span>
+      <span id="syncBadge" class="badge badge-sync">0 pendientes</span>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
+    <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes</button>
+    <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos</button>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Formulario Modal Reactivo -->
+  <div id="reportModal" class="modal-overlay">
+    <div class="modal-content">
+      <h3 id="modalTitle" style="font-size: 18px; color: #0f172a;">Levantamiento en Campo</h3>
+      
+      <input type="hidden" id="reportId" />
+      <input type="hidden" id="createdAt" />
+      <input type="hidden" id="attendedAt" />
+      <input type="hidden" id="lat" />
+      <input type="hidden" id="lng" />
+      <input type="hidden" id="plusCode" />
+      <input type="hidden" id="photoBase64" />
+      <input type="hidden" id="photoUrl" />
+
+      <!-- Control y Evaluación -->
+      <div class="section-title title-blue">Control y Evaluación de Sitio</div>
+      <div style="margin-bottom: 8px;">
+        <span class="form-label" style="display:inline;">Plus Code:</span>
+        <span id="plusCodeDisplay" class="pluscode-badge">764R...</span>
+      </div>
+
+      <div class="row-2">
+        <div>
+          <label class="form-label">Estado</label>
+          <select id="statusSelect" class="form-control" on
