@@ -236,6 +236,8 @@
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
+
+    /* Controles con Input Editable Directo */
     .counter-row {
       display: flex;
       align-items: center;
@@ -253,11 +255,11 @@
     .counter-controls {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .counter-btn {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       border-radius: 8px;
       border: 1px solid #cbd5e1;
       background: white;
@@ -265,13 +267,25 @@
       font-weight: bold;
       color: #0f172a;
       touch-action: manipulation;
+      cursor: pointer;
     }
-    .counter-val {
+    .counter-input {
+      width: 64px;
+      height: 36px;
+      text-align: center;
       font-size: 16px;
       font-weight: 800;
-      width: 28px;
-      text-align: center;
       color: #0284c7;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0 4px;
+      -moz-appearance: textfield;
+    }
+    .counter-input::-webkit-outer-spin-button,
+    .counter-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
 
     /* Filas SI / NO */
@@ -350,6 +364,19 @@
       display: none;
     }
 
+    /* Checkbox de Entregas en Pendiente */
+    .delivery-toggle-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 14px 0;
+      cursor: pointer;
+    }
+
     .action-row {
       display: flex;
       gap: 10px;
@@ -412,7 +439,7 @@
     <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos</button>
   </div>
 
-  <!-- Contenedor del Mapa (Sin controles de zoom en pantalla) -->
+  <!-- Contenedor del Mapa -->
   <div id="map"></div>
 
   <!-- Formulario Modal Reactivo -->
@@ -439,7 +466,7 @@
       <div class="row-2">
         <div>
           <label class="form-label">Estado</label>
-          <select id="statusSelect" class="form-control" onchange="toggleSectionsByStatus()">
+          <select id="statusSelect" class="form-control" onchange="handleStatusChange()">
             <option value="PENDIENTE">Pendiente</option>
             <option value="ATENDIDO">Atendido</option>
           </select>
@@ -462,8 +489,8 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <!-- Captura / Subida de Foto -->
-      <label class="form-label">Foto de la Vivienda / Daño</label>
+      <!-- Captura / Subida de Foto (Opcional) -->
+      <label class="form-label">Foto de la Vivienda / Daño (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
         <button type="button" class="btn-cancel" style="padding:8px 16px; font-size:13px;" onclick="document.getElementById('photoInput').click()">
@@ -487,89 +514,90 @@
         </div>
       </div>
 
-      <!-- Censo Poblacional -->
-      <div class="section-title title-blue">Censo Poblacional y Vulnerabilidad</div>
+      <!-- Censo Poblacional (Inputs editables para números grandes) -->
+      <div class="section-title title-blue">
+        Censo Poblacional y Vulnerabilidad 
+        <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 1</span>
+      </div>
       
       <div class="counter-row">
         <span class="counter-title">Adultos (18 a 59 años)</span>
         <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjust('adultsCount', -1)">-</button>
-          <span id="adultsCountVal" class="counter-val">1</span>
-          <button type="button" class="counter-btn" onclick="adjust('adultsCount', 1)">+</button>
-          <input type="hidden" id="adultsCount" value="1" />
+          <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', -1)">-</button>
+          <input type="number" id="adultsCount" class="counter-input" min="0" value="1" oninput="validateInput(this); updateTotalPeople();" />
+          <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', 1)">+</button>
         </div>
       </div>
 
       <div class="counter-row">
         <span class="counter-title">Adultos Mayores (60+)</span>
         <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjust('seniorsCount', -1)">-</button>
-          <span id="seniorsCountVal" class="counter-val">0</span>
-          <button type="button" class="counter-btn" onclick="adjust('seniorsCount', 1)">+</button>
-          <input type="hidden" id="seniorsCount" value="0" />
+          <button type="button" class="counter-btn" onclick="adjustInput('seniorsCount', -1)">-</button>
+          <input type="number" id="seniorsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
+          <button type="button" class="counter-btn" onclick="adjustInput('seniorsCount', 1)">+</button>
         </div>
       </div>
 
       <div class="counter-row">
         <span class="counter-title">Menores / Niños / Bebés</span>
         <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjust('minorsCount', -1)">-</button>
-          <span id="minorsCountVal" class="counter-val">0</span>
-          <button type="button" class="counter-btn" onclick="adjust('minorsCount', 1)">+</button>
-          <input type="hidden" id="minorsCount" value="0" />
+          <button type="button" class="counter-btn" onclick="adjustInput('minorsCount', -1)">-</button>
+          <input type="number" id="minorsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
+          <button type="button" class="counter-btn" onclick="adjustInput('minorsCount', 1)">+</button>
         </div>
       </div>
 
       <div class="counter-row">
         <span class="counter-title">Personas con Discapacidad</span>
         <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjust('disabledCount', -1)">-</button>
-          <span id="disabledCountVal" class="counter-val">0</span>
-          <button type="button" class="counter-btn" onclick="adjust('disabledCount', 1)">+</button>
-          <input type="hidden" id="disabledCount" value="0" />
+          <button type="button" class="counter-btn" onclick="adjustInput('disabledCount', -1)">-</button>
+          <input type="number" id="disabledCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
+          <button type="button" class="counter-btn" onclick="adjustInput('disabledCount', 1)">+</button>
         </div>
       </div>
 
+      <!-- CASOS MÉDICOS CON VISIBILIDAD REACTIVA DE CHIPS -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjust('medicalCount', -1)">-</button>
-          <span id="medicalCountVal" class="counter-val">0</span>
-          <button type="button" class="counter-btn" onclick="adjust('medicalCount', 1)">+</button>
-          <input type="hidden" id="medicalCount" value="0" />
+          <button type="button" class="counter-btn" onclick="adjustMedicalCount(-1)">-</button>
+          <input type="number" id="medicalCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateMedicalChipsVisibility();" />
+          <button type="button" class="counter-btn" onclick="adjustMedicalCount(1)">+</button>
         </div>
       </div>
 
-      <div class="chip-container" id="medicalChips">
-        <span class="chip" onclick="toggleChip(this)">Insulina / Diabético</span>
-        <span class="chip" onclick="toggleChip(this)">Hipertenso</span>
-        <span class="chip" onclick="toggleChip(this)">Movilidad reducida / Encamado</span>
-        <span class="chip" onclick="toggleChip(this)">Herida / Trauma</span>
-        <span class="chip" onclick="toggleChip(this)">Embarazada</span>
+      <!-- Contenedor condicional de Chips Médicos (Oculto por defecto si es 0) -->
+      <div id="medicalChipsBox" style="display: none;">
+        <label class="form-label" style="font-size: 11px; color: #64748b; margin-top: 4px;">Seleccione condición(es) médica(s):</label>
+        <div class="chip-container" id="medicalChips">
+          <span class="chip" onclick="toggleChip(this)">Insulina / Diabético</span>
+          <span class="chip" onclick="toggleChip(this)">Hipertenso</span>
+          <span class="chip" onclick="toggleChip(this)">Movilidad reducida / Encamado</span>
+          <span class="chip" onclick="toggleChip(this)">Herida / Trauma</span>
+          <span class="chip" onclick="toggleChip(this)">Embarazada</span>
+        </div>
       </div>
 
       <div class="row-2">
         <div class="counter-row">
           <span class="counter-title">Perros</span>
           <div class="counter-controls">
-            <button type="button" class="counter-btn" onclick="adjust('dogsCount', -1)">-</button>
-            <span id="dogsCountVal" class="counter-val">0</span>
-            <button type="button" class="counter-btn" onclick="adjust('dogsCount', 1)">+</button>
-            <input type="hidden" id="dogsCount" value="0" />
+            <button type="button" class="counter-btn" onclick="adjustInput('dogsCount', -1)">-</button>
+            <input type="number" id="dogsCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
+            <button type="button" class="counter-btn" onclick="adjustInput('dogsCount', 1)">+</button>
           </div>
         </div>
         <div class="counter-row">
           <span class="counter-title">Gatos</span>
           <div class="counter-controls">
-            <button type="button" class="counter-btn" onclick="adjust('catsCount', -1)">-</button>
-            <span id="catsCountVal" class="counter-val">0</span>
-            <button type="button" class="counter-btn" onclick="adjust('catsCount', 1)">+</button>
-            <input type="hidden" id="catsCount" value="0" />
+            <button type="button" class="counter-btn" onclick="adjustInput('catsCount', -1)">-</button>
+            <input type="number" id="catsCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
+            <button type="button" class="counter-btn" onclick="adjustInput('catsCount', 1)">+</button>
           </div>
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Colchonetas como principal SI/NO) -->
+      <!-- SECCIÓN NECESIDADES (Visible en PENDIENTE) -->
       <div id="sectionNeeds">
         <div class="section-title title-amber">Necesidades Requeridas (¿Qué necesitan?)</div>
 
@@ -627,7 +655,6 @@
           </div>
         </div>
 
-        <!-- Colchonetas en lugar de Palets -->
         <div class="yn-row">
           <span class="yn-title">Colchonetas</span>
           <div class="yn-toggles">
@@ -647,7 +674,15 @@
         </div>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Visible en ATENDIDO) -->
+      <!-- CHECKBOX PARA DESPLEGAR ENTREGAS CUANDO ESTÁ EN PENDIENTE -->
+      <div id="boxToggleDeliveries" class="delivery-toggle-box" onclick="toggleDeliveryCheck()">
+        <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateDeliveriesVisibility();" />
+        <label for="checkDelivered" style="font-size: 13px; font-weight: 700; color: #166534; cursor: pointer;">
+          📦 ¿Se realizó alguna entrega en esta visita?
+        </label>
+      </div>
+
+      <!-- SECCIÓN ENTREGAS REALIZADAS (Visible con check o si es ATENDIDO) -->
       <div id="sectionDeliveries" style="display: none;">
         <div class="section-title title-green">Entregas Realizadas (¿Qué se entregó?)</div>
 
@@ -705,7 +740,6 @@
           </div>
         </div>
 
-        <!-- Colchonetas en lugar de Palets -->
         <div class="yn-row">
           <span class="yn-title">¿Se entregaron Colchonetas?</span>
           <div class="yn-toggles">
@@ -724,8 +758,8 @@
           <span class="chip" onclick="toggleChip(this)">Ropa</span>
         </div>
 
-        <label class="form-label">Observaciones de Atención</label>
-        <input type="text" id="attendedNotes" class="form-control" placeholder="Ej: Se entregó lona y colchoneta para dormir..." />
+        <label class="form-label">Observaciones de Atención (Opcional)</label>
+        <input type="text" id="attendedNotes" class="form-control" placeholder="Ej: Se entregó lona y colchoneta..." />
       </div>
 
       <div class="action-row">
@@ -742,7 +776,7 @@
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
     // =========================================================================
-    // ALGORITMO COMPLETO DE OPEN LOCATION CODE (ENCODE Y DECODE OFFLINE)
+    // ALGORITMO OFFLINE DE OPEN LOCATION CODE (PLUS CODE)
     // =========================================================================
     const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
 
@@ -882,7 +916,7 @@
     };
 
     // =========================================================================
-    // 2. INICIALIZACIÓN DE MAPA (Calles + Satélite, sin controles de zoom)
+    // 2. INICIALIZACIÓN DE MAPA (Calles + Satélite, sin zoom controles)
     // =========================================================================
     let map;
     let streetLayer;
@@ -1115,21 +1149,87 @@
     };
 
     // =========================================================================
-    // 6. MANIPULACIÓN DEL FORMULARIO Y CONTROLES REACTIVOS
+    // 6. MANEJO DE CONTADORES NUMÉRICOS Y VISIBILIDAD REACTIVA
     // =========================================================================
-    window.toggleSectionsByStatus = () => {
-      const status = document.getElementById('statusSelect').value;
-      const sectionDeliveries = document.getElementById('sectionDeliveries');
-      sectionDeliveries.style.display = (status === 'ATENDIDO') ? 'block' : 'none';
-    };
-
-    window.adjust = (id, delta) => {
+    window.adjustInput = (id, delta) => {
       const input = document.getElementById(id);
-      const valElem = document.getElementById(id + 'Val');
-      let val = parseInt(input.value, 10) + delta;
+      let val = parseInt(input.value, 10) || 0;
+      val += delta;
       if (val < 0) val = 0;
       input.value = val;
-      valElem.textContent = val;
+      updateTotalPeople();
+    };
+
+    // Control específico para Casos Médicos
+    window.adjustMedicalCount = (delta) => {
+      const input = document.getElementById('medicalCount');
+      let val = parseInt(input.value, 10) || 0;
+      val += delta;
+      if (val < 0) val = 0;
+      input.value = val;
+      updateMedicalChipsVisibility();
+    };
+
+    window.updateMedicalChipsVisibility = () => {
+      const val = parseInt(document.getElementById('medicalCount').value, 10) || 0;
+      const box = document.getElementById('medicalChipsBox');
+      if (val >= 1) {
+        box.style.display = 'block';
+      } else {
+        box.style.display = 'none';
+        // Deseleccionar chips si se vuelve a 0
+        document.querySelectorAll('#medicalChips .chip').forEach(c => c.classList.remove('selected'));
+      }
+    };
+
+    window.validateInput = (inputElem) => {
+      let val = parseInt(inputElem.value, 10);
+      if (isNaN(val) || val < 0) {
+        inputElem.value = 0;
+      }
+    };
+
+    window.updateTotalPeople = () => {
+      const adults = parseInt(document.getElementById('adultsCount').value, 10) || 0;
+      const seniors = parseInt(document.getElementById('seniorsCount').value, 10) || 0;
+      const minors = parseInt(document.getElementById('minorsCount').value, 10) || 0;
+      const total = adults + seniors + minors;
+      const headerElem = document.getElementById('totalPeopleHeader');
+      if (headerElem) {
+        headerElem.textContent = `Total: ${total}`;
+      }
+    };
+
+    window.handleStatusChange = () => {
+      const status = document.getElementById('statusSelect').value;
+      const boxToggle = document.getElementById('boxToggleDeliveries');
+      const sectionDeliveries = document.getElementById('sectionDeliveries');
+
+      if (status === 'ATENDIDO') {
+        boxToggle.style.display = 'none';
+        sectionDeliveries.style.display = 'block';
+      } else {
+        boxToggle.style.display = 'flex';
+        updateDeliveriesVisibility();
+      }
+    };
+
+    window.toggleDeliveryCheck = () => {
+      const chk = document.getElementById('checkDelivered');
+      chk.checked = !chk.checked;
+      updateDeliveriesVisibility();
+    };
+
+    window.updateDeliveriesVisibility = () => {
+      const status = document.getElementById('statusSelect').value;
+      const chk = document.getElementById('checkDelivered');
+      const sectionDeliveries = document.getElementById('sectionDeliveries');
+
+      if (status === 'ATENDIDO' || chk.checked) {
+        sectionDeliveries.style.display = 'block';
+      } else {
+        sectionDeliveries.style.display = 'none';
+      }
     };
 
     window.setYN = (hiddenId, value, buttonElem) => {
@@ -1173,11 +1273,6 @@
       });
     }
 
-    function setCounter(id, val) {
-      document.getElementById(id).value = val;
-      document.getElementById(id + 'Val').textContent = val;
-    }
-
     function openModal(report = null, lat = null, lng = null) {
       const currentLat = report ? report.lat : lat;
       const currentLng = report ? report.lng : lng;
@@ -1206,22 +1301,29 @@
         photoStatus.textContent = 'Sin foto adjunta';
       }
 
-      document.getElementById('statusSelect').value = report ? report.status : 'PENDIENTE';
+      const status = report ? report.status : 'PENDIENTE';
+      document.getElementById('statusSelect').value = status;
       document.getElementById('prioritySelect').value = report ? report.priority : 'MEDIA';
       document.getElementById('houseDamageSelect').value = report ? report.houseDamage : 'MENOR / HABITABLE';
       document.getElementById('brigadistaInput').value = report ? (report.brigadista || '') : (localStorage.getItem('lastBrigadista') || '');
       document.getElementById('contactName').value = report ? (report.contactName || '') : '';
       document.getElementById('contactPhone').value = report ? (report.contactPhone || '') : '';
 
-      setCounter('adultsCount', report ? (report.adultsCount ?? 1) : 1);
-      setCounter('seniorsCount', report ? (report.seniorsCount ?? 0) : 0);
-      setCounter('minorsCount', report ? (report.minorsCount ?? 0) : 0);
-      setCounter('disabledCount', report ? (report.disabledCount ?? 0) : 0);
-      setCounter('medicalCount', report ? (report.medicalCasesCount ?? 0) : 0);
+      // Asignar valores a inputs editables
+      document.getElementById('adultsCount').value = report ? (report.adultsCount ?? 1) : 1;
+      document.getElementById('seniorsCount').value = report ? (report.seniorsCount ?? 0) : 0;
+      document.getElementById('minorsCount').value = report ? (report.minorsCount ?? 0) : 0;
+      document.getElementById('disabledCount').value = report ? (report.disabledCount ?? 0) : 0;
+      
+      const medicalCases = report ? (report.medicalCasesCount ?? 0) : 0;
+      document.getElementById('medicalCount').value = medicalCases;
       setSelectedChips('medicalChips', report ? report.medicalConditions : '');
+      updateMedicalChipsVisibility();
 
-      setCounter('dogsCount', report ? (report.dogsCount ?? 0) : 0);
-      setCounter('catsCount', report ? (report.catsCount ?? 0) : 0);
+      document.getElementById('dogsCount').value = report ? (report.dogsCount ?? 0) : 0;
+      document.getElementById('catsCount').value = report ? (report.catsCount ?? 0) : 0;
+
+      updateTotalPeople();
 
       // Necesidades (SI / NO)
       updateYNUI('necWater', report ? Boolean(report.necWater) : false);
@@ -1233,10 +1335,18 @@
       updateYNUI('necColchonetas', report ? Boolean(report.necColchonetas) : false);
       setSelectedChips('necOtherChips', report ? report.necOtherSupplies : '');
 
+      // Checkbox de entregas en pendiente
+      const hasDeliveries = report && (
+        report.entWater || report.entFood || report.entHygiene || 
+        report.entLona || report.entCamping || report.entToldas || 
+        report.entColchonetas || (report.entOtherSupplies && report.entOtherSupplies.length > 0)
+      );
+      document.getElementById('checkDelivered').checked = Boolean(hasDeliveries);
+
       // Entregas (SI / NO)
       updateYNUI('entWater', report ? Boolean(report.entWater) : false);
-      updateYNUI('entFood', report ? Boolean(report.entFood) : true);
-      updateYNUI('entHygiene', report ? Boolean(report.entHygiene) : true);
+      updateYNUI('entFood', report ? Boolean(report.entFood) : false);
+      updateYNUI('entHygiene', report ? Boolean(report.entHygiene) : false);
       updateYNUI('entLona', report ? Boolean(report.entLona) : false);
       updateYNUI('entCamping', report ? Boolean(report.entCamping) : false);
       updateYNUI('entToldas', report ? Boolean(report.entToldas) : false);
@@ -1244,7 +1354,7 @@
       setSelectedChips('entOtherChips', report ? report.entOtherSupplies : '');
       document.getElementById('attendedNotes').value = report ? (report.attendedNotes || '') : '';
 
-      toggleSectionsByStatus();
+      handleStatusChange();
       document.getElementById('reportModal').style.display = 'flex';
     }
 
@@ -1273,10 +1383,15 @@
         attendedAt = "";
       }
 
-      const adults = parseInt(document.getElementById('adultsCount').value, 10);
-      const seniors = parseInt(document.getElementById('seniorsCount').value, 10);
-      const minors = parseInt(document.getElementById('minorsCount').value, 10);
+      const adults = parseInt(document.getElementById('adultsCount').value, 10) || 0;
+      const seniors = parseInt(document.getElementById('seniorsCount').value, 10) || 0;
+      const minors = parseInt(document.getElementById('minorsCount').value, 10) || 0;
       const totalPeople = adults + seniors + minors;
+
+      const isDeliveredActive = status === 'ATENDIDO' || document.getElementById('checkDelivered').checked;
+
+      const medicalCount = parseInt(document.getElementById('medicalCount').value, 10) || 0;
+      const medicalConditions = medicalCount >= 1 ? getSelectedChips('medicalChips') : '';
 
       const reportData = {
         id: id,
@@ -1299,11 +1414,11 @@
         adultsCount: adults,
         seniorsCount: seniors,
         minorsCount: minors,
-        disabledCount: parseInt(document.getElementById('disabledCount').value, 10),
-        medicalCasesCount: parseInt(document.getElementById('medicalCount').value, 10),
-        medicalConditions: getSelectedChips('medicalChips'),
-        dogsCount: parseInt(document.getElementById('dogsCount').value, 10),
-        catsCount: parseInt(document.getElementById('catsCount').value, 10),
+        disabledCount: parseInt(document.getElementById('disabledCount').value, 10) || 0,
+        medicalCasesCount: medicalCount,
+        medicalConditions: medicalConditions,
+        dogsCount: parseInt(document.getElementById('dogsCount').value, 10) || 0,
+        catsCount: parseInt(document.getElementById('catsCount').value, 10) || 0,
 
         // Necesidades
         necWater: document.getElementById('necWater').value === 'true',
@@ -1315,16 +1430,16 @@
         necColchonetas: document.getElementById('necColchonetas').value === 'true',
         necOtherSupplies: getSelectedChips('necOtherChips'),
 
-        // Entregas
-        entWater: document.getElementById('entWater').value === 'true',
-        entFood: document.getElementById('entFood').value === 'true',
-        entHygiene: document.getElementById('entHygiene').value === 'true',
-        entLona: document.getElementById('entLona').value === 'true',
-        entCamping: document.getElementById('entCamping').value === 'true',
-        entToldas: document.getElementById('entToldas').value === 'true',
-        entColchonetas: document.getElementById('entColchonetas').value === 'true',
-        entOtherSupplies: getSelectedChips('entOtherChips'),
-        attendedNotes: document.getElementById('attendedNotes').value.trim(),
+        // Entregas (Solo si el check está activo o el estado es Atendido)
+        entWater: isDeliveredActive && (document.getElementById('entWater').value === 'true'),
+        entFood: isDeliveredActive && (document.getElementById('entFood').value === 'true'),
+        entHygiene: isDeliveredActive && (document.getElementById('entHygiene').value === 'true'),
+        entLona: isDeliveredActive && (document.getElementById('entLona').value === 'true'),
+        entCamping: isDeliveredActive && (document.getElementById('entCamping').value === 'true'),
+        entToldas: isDeliveredActive && (document.getElementById('entToldas').value === 'true'),
+        entColchonetas: isDeliveredActive && (document.getElementById('entColchonetas').value === 'true'),
+        entOtherSupplies: isDeliveredActive ? getSelectedChips('entOtherChips') : '',
+        attendedNotes: isDeliveredActive ? document.getElementById('attendedNotes').value.trim() : '',
 
         syncStatus: 'PENDING'
       };
