@@ -24,7 +24,6 @@
       background-color: #0f172a;
     }
 
-    /* Layout Split: Formulario Izquierda | Mapa Derecha */
     .app-layout {
       display: flex;
       height: 100vh;
@@ -33,7 +32,7 @@
       position: relative;
     }
 
-    /* Panel Izquierdo: Formulario Colapsable */
+    /* Panel Izquierdo */
     .sidebar-panel {
       width: 490px;
       min-width: 380px;
@@ -56,7 +55,7 @@
       bottom: 0;
     }
 
-    /* Panel Derecho: Mapa */
+    /* Panel Derecho */
     .map-panel {
       flex: 1;
       height: 100%;
@@ -89,31 +88,34 @@
       }
     }
 
-    /* Cabecera Rotary */
+    /* Cabecera Rotary con proporción original protegida */
     .rotary-header {
       display: flex;
       align-items: center;
       gap: 12px;
       margin-bottom: 12px;
       border-bottom: 2px solid #f1f5f9;
-      padding-bottom: 8px;
+      padding-bottom: 10px;
     }
-    .rotary-logo {
-      height: 38px;
-      max-width: 150px;
+    .rotary-logo-img {
+      height: 46px;
+      width: auto;
+      max-width: 130px;
       object-fit: contain;
+      flex-shrink: 0;
     }
     .rotary-title {
       font-size: 19px;
       font-weight: 800;
       color: #0f172a;
       letter-spacing: -0.5px;
+      line-height: 1.1;
     }
     .rotary-title span {
       color: #e0004d;
     }
 
-    /* Botón flotante para Alternar Formulario */
+    /* Botón flotante para Ocultar/Ver Formulario */
     .btn-toggle-form {
       position: absolute;
       top: 12px;
@@ -137,7 +139,7 @@
     .map-top-bar {
       position: absolute;
       top: 10px;
-      left: 160px;
+      left: 175px;
       right: 10px;
       z-index: 1000;
       display: flex;
@@ -181,7 +183,7 @@
       pointer-events: auto;
     }
 
-    /* Barra de Búsqueda Mixta (Plus Code o Nombre de Comunidad) */
+    /* Barra de Búsqueda Mixta */
     .search-layer-bar {
       display: flex;
       gap: 6px;
@@ -429,7 +431,6 @@
       border-color: #0284c7;
     }
 
-    /* Caja de Foto con dos botones (Tomar o Cargar) */
     .photo-box {
       border: 2px dashed #cbd5e1;
       border-radius: 10px;
@@ -500,7 +501,7 @@
 </head>
 <body>
 
-  <!-- BOTÓN FLOTANTE PARA OCULTAR O MOSTRAR EL FORMULARIO -->
+  <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
   <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
     📋 <span id="toggleFormText">Ocultar Formulario</span>
   </button>
@@ -510,19 +511,9 @@
     <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
     <div id="sidebarPanel" class="sidebar-panel">
       
-      <!-- Encabezado con Logo Oficial Rotaract -->
+      <!-- Cabecera con Logo Nítido y Proporcional -->
       <div class="rotary-header">
-        <svg class="rotary-logo" viewBox="0 0 835 361" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <text x="10" y="250" font-family="Arial, Helvetica, sans-serif" font-size="200" font-weight="bold" fill="#E0004D">Rotaract</text>
-          <g transform="translate(620, 20) scale(0.9)">
-            <circle cx="170" cy="170" r="140" fill="#E0004D"/>
-            <circle cx="170" cy="170" r="110" fill="white"/>
-            <circle cx="170" cy="170" r="40" fill="#E0004D"/>
-            <path d="M170 30 L170 310 M30 170 L310 170 M71 71 L269 269 M71 269 L269 71" stroke="#E0004D" stroke-width="24"/>
-            <text x="170" y="80" text-anchor="middle" font-family="Arial" font-size="28" font-weight="bold" fill="#E0004D">ROTARY</text>
-            <text x="170" y="280" text-anchor="middle" font-family="Arial" font-size="20" font-weight="bold" fill="#E0004D">INTERNATIONAL</text>
-          </g>
-        </svg>
+        <img class="rotary-logo-img" src="toppng.com-rotaract-logo-2000x865.png" alt="Rotaract Logo" onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 80\'><text x=\'10\' y=\'50\' font-family=\'Arial\' font-size=\'32\' font-weight=\'bold\' fill=\'%23E0004D\'>Rotaract</text></svg>'" />
         <div>
           <h1 class="rotary-title">Brigada <span>Rotary</span></h1>
           <p style="font-size: 11px; color: #64748b; font-weight: 600;">Censo y Auxilio en Emergencias</p>
@@ -538,7 +529,7 @@
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
-      <!-- Control y Ubicación -->
+      <!-- Ubicación y Control -->
       <div class="section-title title-blue">Ubicación y Evaluación</div>
       <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
@@ -571,12 +562,10 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <!-- FOTO: Opciones Separadas para Tomar o Cargar -->
+      <!-- FOTO: Tomar Foto o Cargar Foto -->
       <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
-        <!-- Input para Tomar Foto con la Cámara -->
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
-        <!-- Input para Cargar Foto de Galería / Archivo -->
         <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)" />
 
         <div class="photo-actions">
@@ -647,7 +636,7 @@
         </div>
       </div>
 
-      <!-- Casos Médicos (Reactivo: solo se despliega si es >= 1) -->
+      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -703,8 +692,8 @@
         <div class="yn-row">
           <span class="yn-title">Kit de Alimentos</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necFood', false, this)">NO</button>
+            <button type="button" class="yn-btn yes active" onclick="setYN('necFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no" onclick="setYN('necFood', false, this)">NO</button>
             <input type="hidden" id="necFood" value="false" />
           </div>
         </div>
@@ -712,8 +701,8 @@
         <div class="yn-row">
           <span class="yn-title">Kit de Higiene</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necHygiene', false, this)">NO</button>
+            <button type="button" class="yn-btn yes active" onclick="setYN('necHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no" onclick="setYN('necHygiene', false, this)">NO</button>
             <input type="hidden" id="necHygiene" value="false" />
           </div>
         </div>
@@ -792,7 +781,7 @@
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Alimento?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes-green active" onclick="setYN('entFood', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('entFood', false, this)">NO</button>
             <input type="hidden" id="entFood" value="false" />
           </div>
@@ -801,7 +790,7 @@
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Higiene?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes-green active" onclick="setYN('entHygiene', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('entHygiene', false, this)">NO</button>
             <input type="hidden" id="entHygiene" value="false" />
           </div>
@@ -871,7 +860,7 @@
           <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Provincias Centrales</span>
         </div>
 
-        <!-- Buscador Inteligente: Acepta Plus Code o Nombres de Comunidades de Panamá -->
+        <!-- Buscador Inteligente: Plus Code o Nombres de Comunidades de Panamá -->
         <div class="search-layer-bar">
           <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas, Penonomé...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
           <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
@@ -1185,7 +1174,6 @@
       if (currentMarker) map.removeLayer(currentMarker);
       currentMarker = L.marker([lat, lng]).addTo(map);
 
-      // Si el formulario estaba colapsado en móvil, avisar sutilmente
       const panel = document.getElementById('sidebarPanel');
       if (panel.classList.contains('collapsed')) {
         document.getElementById('toggleFormText').textContent = 'Ver Formulario (Punto fijado)';
@@ -1224,12 +1212,10 @@
       );
     };
 
-    // Búsqueda Inteligente: Plus Code o Nombre de Comunidad
     window.handleSmartSearch = async () => {
       const term = document.getElementById('smartSearchInput').value.trim();
       if (!term) return;
 
-      // 1. Intentar decodificar como Plus Code
       const coords = decodePlusCode(term);
       if (coords) {
         map.setView([coords.lat, coords.lng], 17);
@@ -1237,7 +1223,6 @@
         return;
       }
 
-      // 2. Buscar en el índice local offline de Provincias Centrales
       const upperTerm = term.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       for (const [name, coord] of Object.entries(LOCAL_PANAMA_PLACES)) {
         if (name.includes(upperTerm) || upperTerm.includes(name)) {
@@ -1247,7 +1232,6 @@
         }
       }
 
-      // 3. Fallback online con Nominatim enfocado en Panamá si hay internet
       if (navigator.onLine) {
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=pa&q=${encodeURIComponent(term)}`);
@@ -1318,7 +1302,7 @@
             <p><b>Tel:</b> ${r.contactPhone || 'N/A'}</p>
             <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
             <p><b>Daño Casa:</b> ${r.houseDamage}</p>
-            <p><b>Personas:</b> ${r.totalPeople} (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
+            <p><b>Afectados:</b> ${r.totalPeople} personas (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
             ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
@@ -1537,7 +1521,6 @@
       const report = all.find(item => item.id === id);
       if (!report) return;
 
-      // Asegurar que el formulario sea visible
       const panel = document.getElementById('sidebarPanel');
       panel.classList.remove('collapsed');
       document.getElementById('toggleFormText').textContent = 'Ocultar Formulario';
