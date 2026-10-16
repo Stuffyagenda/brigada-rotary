@@ -19,30 +19,70 @@
       padding: 0;
       overflow: hidden;
       font-family: system-ui, -apple-system, sans-serif;
-      background-color: #f1f5f9;
+      background-color: #0f172a;
+    }
+
+    /* Contenedor Principal: Split Pantalla (Izquierda Formulario, Derecha Mapa) */
+    .app-layout {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* Panel Izquierdo: Formulario */
+    .sidebar-panel {
+      width: 480px;
+      min-width: 360px;
+      height: 100%;
+      background: white;
+      overflow-y: auto;
+      padding: 20px;
+      box-shadow: 4px 0 15px rgba(0,0,0,0.15);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Panel Derecho: Mapa */
+    .map-panel {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background: #e2e8f0;
     }
 
     #map {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 100vh;
-      width: 100vw;
-      z-index: 1;
-      background-color: #e2e8f0;
+      height: 100%;
+      width: 100%;
     }
 
-    /* Barra Superior Flotante */
-    .status-bar {
+    /* Responsive: en móviles se apila verticalmente */
+    @media (max-width: 850px) {
+      .app-layout {
+        flex-direction: column-reverse;
+      }
+      .sidebar-panel {
+        width: 100%;
+        height: 55%;
+        border-radius: 20px 20px 0 0;
+      }
+      .map-panel {
+        width: 100%;
+        height: 45%;
+      }
+    }
+
+    /* Barra Superior del Mapa */
+    .map-top-bar {
       position: absolute;
       top: 10px;
       left: 10px;
       right: 10px;
       z-index: 1000;
       display: flex;
-      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
       gap: 8px;
       pointer-events: none;
     }
@@ -70,33 +110,35 @@
     .badge-sync { background-color: #0284c7; }
     .badge-stats { background-color: #334155; }
 
-    /* Barra de Búsqueda Plus Code y Capas */
+    /* Barra de Búsqueda y Capas */
     .search-layer-bar {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      z-index: 1000;
       display: flex;
       gap: 6px;
-      pointer-events: auto;
-      max-width: 480px;
+      max-width: 380px;
     }
     .input-pluscode {
       flex: 1;
-      padding: 8px 12px;
+      padding: 7px 10px;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 12px;
       background: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
       font-weight: 600;
       text-transform: uppercase;
     }
     .btn-search {
-      padding: 8px 12px;
+      padding: 7px 12px;
       background: #0284c7;
       color: white;
       border: none;
       border-radius: 8px;
       font-weight: 700;
       font-size: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
       cursor: pointer;
     }
     .layer-selector {
@@ -107,10 +149,10 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
     .layer-btn {
-      padding: 8px 10px;
+      padding: 7px 10px;
       border: none;
       background: #f8fafc;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       color: #475569;
@@ -123,7 +165,7 @@
     /* Botón flotante "Mi Ubicación" */
     .btn-gps {
       position: absolute;
-      bottom: 80px;
+      bottom: 70px;
       right: 16px;
       z-index: 1000;
       background: #0284c7;
@@ -140,10 +182,10 @@
       gap: 6px;
     }
 
-    /* Barra Inferior de Filtros */
+    /* Barra Filtros en Mapa */
     .filter-bar {
       position: absolute;
-      bottom: 20px;
+      bottom: 15px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
@@ -151,45 +193,24 @@
       background: white;
       border-radius: 30px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.25);
-      padding: 4px;
+      padding: 3px;
     }
     .filter-btn {
-      padding: 8px 16px;
+      padding: 6px 14px;
       border: none;
       background: transparent;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       border-radius: 20px;
       cursor: pointer;
       color: #475569;
-      transition: all 0.2s ease;
     }
     .filter-btn.active {
       background: #0284c7;
       color: white;
     }
 
-    /* Modal de Formulario */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(3px);
-      z-index: 2000;
-      display: none;
-      align-items: flex-end;
-    }
-    .modal-content {
-      background: white;
-      width: 100%;
-      max-width: 520px;
-      margin: 0 auto;
-      border-radius: 20px 20px 0 0;
-      padding: 22px 18px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
-    }
+    /* Estilos del Formulario */
     .section-title {
       font-size: 12px;
       font-weight: 800;
@@ -205,10 +226,11 @@
 
     .form-label {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       color: #475569;
       margin-bottom: 4px;
+      text-transform: uppercase;
     }
     .form-control {
       width: 100%;
@@ -237,7 +259,7 @@
       gap: 10px;
     }
 
-    /* Controles con Input Editable Directo */
+    /* Contadores con Inputs Editables */
     .counter-row {
       display: flex;
       align-items: center;
@@ -258,22 +280,21 @@
       gap: 6px;
     }
     .counter-btn {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
       border: 1px solid #cbd5e1;
       background: white;
       font-size: 18px;
       font-weight: bold;
       color: #0f172a;
-      touch-action: manipulation;
       cursor: pointer;
     }
     .counter-input {
-      width: 64px;
-      height: 36px;
+      width: 60px;
+      height: 34px;
       text-align: center;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 800;
       color: #0284c7;
       background: white;
@@ -338,7 +359,6 @@
       color: #475569;
       cursor: pointer;
       user-select: none;
-      touch-action: manipulation;
     }
     .chip.selected {
       background: #0284c7;
@@ -346,25 +366,23 @@
       border-color: #0284c7;
     }
 
-    /* Foto */
     .photo-box {
       border: 2px dashed #cbd5e1;
       border-radius: 10px;
-      padding: 12px;
+      padding: 10px;
       text-align: center;
       background: #f8fafc;
       margin-bottom: 12px;
     }
     .photo-preview {
       width: 100%;
-      max-height: 160px;
+      max-height: 140px;
       object-fit: cover;
       border-radius: 8px;
-      margin-top: 8px;
+      margin-top: 6px;
       display: none;
     }
 
-    /* Checkbox de Entregas en Pendiente */
     .delivery-toggle-box {
       display: flex;
       align-items: center;
@@ -377,105 +395,59 @@
       cursor: pointer;
     }
 
-    .action-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-    }
     .btn-submit {
-      flex: 1;
+      width: 100%;
       padding: 14px;
       border: none;
       border-radius: 10px;
       background: #0284c7;
       color: white;
       font-weight: 700;
-      font-size: 15px;
+      font-size: 16px;
       cursor: pointer;
-    }
-    .btn-cancel {
-      padding: 14px 20px;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      background: #f1f5f9;
-      color: #475569;
-      font-weight: 600;
-      font-size: 15px;
-      cursor: pointer;
+      margin-top: 15px;
+      box-shadow: 0 4px 10px rgba(2,132,199,0.3);
     }
   </style>
 </head>
 <body>
 
-  <!-- Barras Superiores -->
-  <div class="status-bar">
-    <div class="badge-group">
-      <span id="connBadge" class="badge badge-online">En línea</span>
-      <span id="syncBadge" class="badge badge-sync">0 pendientes</span>
-      <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
-      <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-    </div>
+  <div class="app-layout">
 
-    <!-- Buscador Plus Code y Selector Satelital -->
-    <div class="search-layer-bar">
-      <input type="text" id="plusCodeSearchInput" class="input-pluscode" placeholder="Buscar Plus Code (Ej: 764R...)" />
-      <button type="button" class="btn-search" onclick="searchPlusCode()">Ir</button>
-      <div class="layer-selector">
-        <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
-        <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Botón "Mi Ubicación" -->
-  <button type="button" class="btn-gps" onclick="goToMyLocation()">
-    📍 Mi Ubicación
-  </button>
-
-  <!-- Filtros Inferiores -->
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes</button>
-    <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos</button>
-  </div>
-
-  <!-- Contenedor del Mapa -->
-  <div id="map"></div>
-
-  <!-- Formulario Modal Reactivo -->
-  <div id="reportModal" class="modal-overlay">
-    <div class="modal-content">
-      <h3 id="modalTitle" style="font-size: 18px; color: #0f172a;">Levantamiento en Campo</h3>
+    <!-- PANEL IZQUIERDO: FORMULARIO SIEMPRE VISIBLE (VALORES EN 0 Y NO) -->
+    <div class="sidebar-panel">
+      <h2 id="formTitle" style="font-size: 18px; color: #0f172a; margin-bottom: 8px;">Levantamiento de Auxilio</h2>
+      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Toca cualquier punto del mapa para fijar la ubicación.</p>
       
       <input type="hidden" id="reportId" />
       <input type="hidden" id="createdAt" />
       <input type="hidden" id="attendedAt" />
-      <input type="hidden" id="lat" />
-      <input type="hidden" id="lng" />
-      <input type="hidden" id="plusCode" />
+      <input type="hidden" id="lat" value="8.427" />
+      <input type="hidden" id="lng" value="-80.485" />
+      <input type="hidden" id="plusCode" value="764R6FW7+C8" />
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
       <!-- Control y Evaluación -->
-      <div class="section-title title-blue">Control y Evaluación de Sitio</div>
-      <div style="margin-bottom: 8px;">
+      <div class="section-title title-blue">Ubicación y Evaluación</div>
+      <div style="margin-bottom: 6px;">
         <span class="form-label" style="display:inline;">Plus Code:</span>
-        <span id="plusCodeDisplay" class="pluscode-badge">764R...</span>
+        <span id="plusCodeDisplay" class="pluscode-badge">764R6FW7+C8</span>
       </div>
 
       <div class="row-2">
         <div>
           <label class="form-label">Estado</label>
           <select id="statusSelect" class="form-control" onchange="handleStatusChange()">
-            <option value="PENDIENTE">Pendiente</option>
+            <option value="PENDIENTE" selected>Pendiente</option>
             <option value="ATENDIDO">Atendido</option>
           </select>
         </div>
         <div>
           <label class="form-label">Prioridad</label>
           <select id="prioritySelect" class="form-control">
-            <option value="ALTA">Alta / Urgente</option>
             <option value="MEDIA" selected>Media</option>
+            <option value="ALTA">Alta / Urgente</option>
             <option value="BAJA">Baja</option>
           </select>
         </div>
@@ -483,17 +455,16 @@
 
       <label class="form-label">Afectación de Vivienda</label>
       <select id="houseDamageSelect" class="form-control">
-        <option value="NINGUNO">Sin daño aparente</option>
         <option value="MENOR / HABITABLE" selected>Daño menor (Habitable)</option>
+        <option value="NINGUNO">Sin daño aparente</option>
         <option value="GRAVE / PARCIAL">Daño grave / parcial (Riesgo)</option>
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <!-- Captura / Subida de Foto (Opcional) -->
-      <label class="form-label">Foto de la Vivienda / Daño (Opcional)</label>
+      <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
-        <button type="button" class="btn-cancel" style="padding:8px 16px; font-size:13px;" onclick="document.getElementById('photoInput').click()">
+        <button type="button" class="layer-btn" style="padding:8px 16px; border:1px solid #cbd5e1; border-radius:6px;" onclick="document.getElementById('photoInput').click()">
           📷 Tomar / Adjuntar Foto
         </button>
         <img id="photoPreviewImg" class="photo-preview" />
@@ -514,17 +485,17 @@
         </div>
       </div>
 
-      <!-- Censo Poblacional (Inputs editables para números grandes) -->
+      <!-- Censo Poblacional (Todo en 0 por defecto) -->
       <div class="section-title title-blue">
-        Censo Poblacional y Vulnerabilidad 
-        <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 1</span>
+        Censo Poblacional
+        <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 0</span>
       </div>
       
       <div class="counter-row">
-        <span class="counter-title">Adultos (18 a 59 años)</span>
+        <span class="counter-title">Adultos (18 a 59)</span>
         <div class="counter-controls">
           <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', -1)">-</button>
-          <input type="number" id="adultsCount" class="counter-input" min="0" value="1" oninput="validateInput(this); updateTotalPeople();" />
+          <input type="number" id="adultsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
           <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', 1)">+</button>
         </div>
       </div>
@@ -556,7 +527,7 @@
         </div>
       </div>
 
-      <!-- CASOS MÉDICOS CON VISIBILIDAD REACTIVA DE CHIPS -->
+      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -566,13 +537,12 @@
         </div>
       </div>
 
-      <!-- Contenedor condicional de Chips Médicos (Oculto por defecto si es 0) -->
       <div id="medicalChipsBox" style="display: none;">
-        <label class="form-label" style="font-size: 11px; color: #64748b; margin-top: 4px;">Seleccione condición(es) médica(s):</label>
+        <label class="form-label" style="font-size: 11px; color: #64748b;">Condiciones Médicas:</label>
         <div class="chip-container" id="medicalChips">
           <span class="chip" onclick="toggleChip(this)">Insulina / Diabético</span>
           <span class="chip" onclick="toggleChip(this)">Hipertenso</span>
-          <span class="chip" onclick="toggleChip(this)">Movilidad reducida / Encamado</span>
+          <span class="chip" onclick="toggleChip(this)">Movilidad reducida</span>
           <span class="chip" onclick="toggleChip(this)">Herida / Trauma</span>
           <span class="chip" onclick="toggleChip(this)">Embarazada</span>
         </div>
@@ -597,9 +567,9 @@
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Visible en PENDIENTE) -->
+      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
       <div id="sectionNeeds">
-        <div class="section-title title-amber">Necesidades Requeridas (¿Qué necesitan?)</div>
+        <div class="section-title title-amber">Necesidades Requeridas (Todo en NO por defecto)</div>
 
         <div class="yn-row">
           <span class="yn-title">Agua Potable</span>
@@ -613,18 +583,18 @@
         <div class="yn-row">
           <span class="yn-title">Kit de Alimentos</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('necFood', false, this)">NO</button>
-            <input type="hidden" id="necFood" value="true" />
+            <button type="button" class="yn-btn yes" onclick="setYN('necFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('necFood', false, this)">NO</button>
+            <input type="hidden" id="necFood" value="false" />
           </div>
         </div>
 
         <div class="yn-row">
           <span class="yn-title">Kit de Higiene</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('necHygiene', false, this)">NO</button>
-            <input type="hidden" id="necHygiene" value="true" />
+            <button type="button" class="yn-btn yes" onclick="setYN('necHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('necHygiene', false, this)">NO</button>
+            <input type="hidden" id="necHygiene" value="false" />
           </div>
         </div>
 
@@ -682,9 +652,9 @@
         </label>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Visible con check o si es ATENDIDO) -->
+      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
       <div id="sectionDeliveries" style="display: none;">
-        <div class="section-title title-green">Entregas Realizadas (¿Qué se entregó?)</div>
+        <div class="section-title title-green">Entregas Realizadas (Todo en NO por defecto)</div>
 
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Agua?</span>
@@ -698,18 +668,18 @@
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Alimento?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('entFood', false, this)">NO</button>
-            <input type="hidden" id="entFood" value="true" />
+            <button type="button" class="yn-btn yes-green" onclick="setYN('entFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('entFood', false, this)">NO</button>
+            <input type="hidden" id="entFood" value="false" />
           </div>
         </div>
 
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Higiene?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no" onclick="setYN('entHygiene', false, this)">NO</button>
-            <input type="hidden" id="entHygiene" value="true" />
+            <button type="button" class="yn-btn yes-green" onclick="setYN('entHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn no active" onclick="setYN('entHygiene', false, this)">NO</button>
+            <input type="hidden" id="entHygiene" value="false" />
           </div>
         </div>
 
@@ -759,21 +729,65 @@
         </div>
 
         <label class="form-label">Observaciones de Atención (Opcional)</label>
-        <input type="text" id="attendedNotes" class="form-control" placeholder="Ej: Se entregó lona y colchoneta..." />
+        <input type="text" id="attendedNotes" class="form-control" placeholder="Ej: Se entregó lona..." />
       </div>
 
-      <div class="action-row">
-        <button type="button" class="btn-cancel" onclick="closeModal()">Cerrar</button>
-        <button type="button" class="btn-submit" onclick="saveRecord()">Guardar Reporte</button>
-      </div>
+      <button type="button" class="btn-submit" onclick="saveRecord()">💾 Guardar Reporte</button>
     </div>
+
+    <!-- PANEL DERECHO: MAPA LEAFLET -->
+    <div class="map-panel">
+      
+      <div class="map-top-bar">
+        <div class="badge-group">
+          <span id="connBadge" class="badge badge-online">En línea</span>
+          <span id="syncBadge" class="badge badge-sync">0 pendientes</span>
+          <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
+          <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
+        </div>
+      </div>
+
+      <!-- Buscador Plus Code y Selector Satélite -->
+      <div class="search-layer-bar">
+        <input type="text" id="plusCodeSearchInput" class="input-pluscode" placeholder="Buscar Plus Code..." />
+        <button type="button" class="btn-search" onclick="searchPlusCode()">Ir</button>
+        <div class="layer-selector">
+          <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
+          <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
+        </div>
+      </div>
+
+      <!-- Botón Mi Ubicación -->
+      <button type="button" class="btn-gps" onclick="goToMyLocation()">
+        📍 Mi Ubicación
+      </button>
+
+      <!-- Filtros de Capas -->
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
+        <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes</button>
+        <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos</button>
+      </div>
+
+      <div id="map"></div>
+    </div>
+
   </div>
 
   <script>
     // =========================================================================
-    // CONFIGURACIÓN: TU WEBHOOK DE GOOGLE APPS SCRIPT
+    // CONFIGURACIÓN: WEBHOOK DE GOOGLE APPS SCRIPT
     // =========================================================================
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
+
+    // REGISTRO DEL SERVICE WORKER PARA APERTURA 100% OFFLINE
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('Service Worker listo para modo offline'))
+          .catch((err) => console.warn('Aviso SW:', err));
+      });
+    }
 
     // =========================================================================
     // ALGORITMO OFFLINE DE OPEN LOCATION CODE (PLUS CODE)
@@ -841,7 +855,7 @@
     // 1. CAPA DE ALMACENAMIENTO ASÍNCRONO (IndexedDB)
     // =========================================================================
     const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 8;
+    const DB_VERSION = 9;
     const STORE_NAME = 'reports';
 
     function openDatabase() {
@@ -916,13 +930,14 @@
     };
 
     // =========================================================================
-    // 2. INICIALIZACIÓN DE MAPA (Calles + Satélite, sin zoom controles)
+    // 2. INICIALIZACIÓN DE MAPA (Calles + Satélite, sin controles de zoom)
     // =========================================================================
     let map;
     let streetLayer;
     let satLayer;
     let layerPending;
     let layerAttended;
+    let currentMarker = null;
 
     function initMap() {
       streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -943,11 +958,24 @@
       layerAttended = L.layerGroup().addTo(map);
 
       map.on('click', (e) => {
-        openModal(null, e.latlng.lat, e.latlng.lng);
+        setLocationInForm(e.latlng.lat, e.latlng.lng);
       });
 
       setTimeout(() => { map.invalidateSize(); }, 300);
       refreshMapAndBadges();
+    }
+
+    function setLocationInForm(lat, lng) {
+      const code = encodePlusCode(lat, lng);
+      document.getElementById('lat').value = lat;
+      document.getElementById('lng').value = lng;
+      document.getElementById('plusCode').value = code;
+      document.getElementById('plusCodeDisplay').textContent = code;
+
+      if (currentMarker) {
+        map.removeLayer(currentMarker);
+      }
+      currentMarker = L.marker([lat, lng]).addTo(map);
     }
 
     window.switchLayer = (type) => {
@@ -968,7 +996,7 @@
     // =========================================================================
     window.goToMyLocation = () => {
       if (!navigator.geolocation) {
-        alert('La geolocalización no está soportada en tu navegador.');
+        alert('Geolocalización no soportada.');
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -976,10 +1004,10 @@
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           map.setView([lat, lng], 17);
-          openModal(null, lat, lng);
+          setLocationInForm(lat, lng);
         },
         (err) => {
-          alert('No se pudo obtener tu ubicación GPS: ' + err.message);
+          alert('No se pudo obtener ubicación: ' + err.message);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
@@ -992,9 +1020,9 @@
       const coords = decodePlusCode(codeInput);
       if (coords) {
         map.setView([coords.lat, coords.lng], 17);
-        openModal(null, coords.lat, coords.lng);
+        setLocationInForm(coords.lat, coords.lng);
       } else {
-        alert('Plus Code no válido o incompleto. Debe tener al menos 8 caracteres (ej: 764R6FW7+C8).');
+        alert('Plus Code no válido. Debe tener mínimo 8 caracteres (ej: 764R6FW7+C8).');
       }
     };
 
@@ -1060,14 +1088,13 @@
         });
 
         marker.bindPopup(`
-          <div style="font-size:13px; min-width: 190px;">
+          <div style="font-size:13px; min-width: 180px;">
             <p><b>Contacto:</b> ${r.contactName || 'No indicado'}</p>
             <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
-            <p><b>Estado:</b> ${r.status} (${r.priority})</p>
-            <p><b>Daño:</b> ${r.houseDamage}</p>
+            <p><b>Estado:</b> ${r.status}</p>
             <p><b>Personas:</b> ${r.totalPeople} | <b>Disc:</b> ${r.disabledCount}</p>
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
-            <button style="margin-top:8px; width:100%; padding:6px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.editReport('${r.id}')">Editar / Atender</button>
+            <button style="margin-top:8px; width:100%; padding:6px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">Cargar en Formulario</button>
           </div>
         `);
 
@@ -1104,14 +1131,14 @@
     }
 
     // =========================================================================
-    // 5. PROCESAMIENTO Y COMPRESIÓN DE FOTO EN CLIENTE
+    // 5. PROCESAMIENTO Y COMPRESIÓN DE FOTO
     // =========================================================================
     window.handlePhotoUpload = (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
       const photoStatus = document.getElementById('photoStatusText');
-      photoStatus.textContent = 'Optimizando foto para campo...';
+      photoStatus.textContent = 'Optimizando foto...';
 
       const reader = new FileReader();
       reader.onload = (readerEvent) => {
@@ -1160,7 +1187,6 @@
       updateTotalPeople();
     };
 
-    // Control específico para Casos Médicos
     window.adjustMedicalCount = (delta) => {
       const input = document.getElementById('medicalCount');
       let val = parseInt(input.value, 10) || 0;
@@ -1177,7 +1203,6 @@
         box.style.display = 'block';
       } else {
         box.style.display = 'none';
-        // Deseleccionar chips si se vuelve a 0
         document.querySelectorAll('#medicalChips .chip').forEach(c => c.classList.remove('selected'));
       }
     };
@@ -1273,100 +1298,126 @@
       });
     }
 
-    function openModal(report = null, lat = null, lng = null) {
-      const currentLat = report ? report.lat : lat;
-      const currentLng = report ? report.lng : lng;
-      const plusCode = report ? report.plusCode : encodePlusCode(currentLat, currentLng);
+    // Cargar reporte existente al formulario al tocar "Cargar en Formulario" en el mapa
+    window.loadReportToForm = async (id) => {
+      const all = await StorageService.getAllReports();
+      const report = all.find(item => item.id === id);
+      if (!report) return;
 
-      document.getElementById('modalTitle').textContent = report ? 'Editar / Atender Reporte' : 'Nuevo Levantamiento';
-      document.getElementById('reportId').value = report ? report.id : '';
-      document.getElementById('createdAt').value = report ? report.createdAt : new Date().toISOString();
-      document.getElementById('attendedAt').value = report ? (report.attendedAt || '') : '';
-      document.getElementById('lat').value = currentLat;
-      document.getElementById('lng').value = currentLng;
-      document.getElementById('plusCode').value = plusCode;
-      document.getElementById('plusCodeDisplay').textContent = plusCode;
+      document.getElementById('formTitle').textContent = 'Editar / Actualizar Reporte';
+      document.getElementById('reportId').value = report.id;
+      document.getElementById('createdAt').value = report.createdAt;
+      document.getElementById('attendedAt').value = report.attendedAt || '';
+      document.getElementById('lat').value = report.lat;
+      document.getElementById('lng').value = report.lng;
+      document.getElementById('plusCode').value = report.plusCode;
+      document.getElementById('plusCodeDisplay').textContent = report.plusCode;
 
       document.getElementById('photoBase64').value = '';
-      document.getElementById('photoUrl').value = report ? (report.photoUrl || '') : '';
+      document.getElementById('photoUrl').value = report.photoUrl || '';
       const previewImg = document.getElementById('photoPreviewImg');
       const photoStatus = document.getElementById('photoStatusText');
 
-      if (report && (report.photoUrl || report.photoBase64)) {
+      if (report.photoUrl || report.photoBase64) {
         previewImg.src = report.photoBase64 || report.photoUrl;
         previewImg.style.display = 'block';
-        photoStatus.textContent = report.photoUrl ? 'Foto guardada en Drive' : 'Foto guardada localmente';
+        photoStatus.textContent = report.photoUrl ? 'Foto en Google Drive' : 'Foto en memoria local';
       } else {
         previewImg.style.display = 'none';
-        photoStatus.textContent = 'Sin foto adjunta';
+        photoStatus.textContent = '';
       }
 
-      const status = report ? report.status : 'PENDIENTE';
-      document.getElementById('statusSelect').value = status;
-      document.getElementById('prioritySelect').value = report ? report.priority : 'MEDIA';
-      document.getElementById('houseDamageSelect').value = report ? report.houseDamage : 'MENOR / HABITABLE';
-      document.getElementById('brigadistaInput').value = report ? (report.brigadista || '') : (localStorage.getItem('lastBrigadista') || '');
-      document.getElementById('contactName').value = report ? (report.contactName || '') : '';
-      document.getElementById('contactPhone').value = report ? (report.contactPhone || '') : '';
+      document.getElementById('statusSelect').value = report.status || 'PENDIENTE';
+      document.getElementById('prioritySelect').value = report.priority || 'MEDIA';
+      document.getElementById('houseDamageSelect').value = report.houseDamage || 'MENOR / HABITABLE';
+      document.getElementById('brigadistaInput').value = report.brigadista || '';
+      document.getElementById('contactName').value = report.contactName || '';
+      document.getElementById('contactPhone').value = report.contactPhone || '';
 
-      // Asignar valores a inputs editables
-      document.getElementById('adultsCount').value = report ? (report.adultsCount ?? 1) : 1;
-      document.getElementById('seniorsCount').value = report ? (report.seniorsCount ?? 0) : 0;
-      document.getElementById('minorsCount').value = report ? (report.minorsCount ?? 0) : 0;
-      document.getElementById('disabledCount').value = report ? (report.disabledCount ?? 0) : 0;
+      document.getElementById('adultsCount').value = report.adultsCount ?? 0;
+      document.getElementById('seniorsCount').value = report.seniorsCount ?? 0;
+      document.getElementById('minorsCount').value = report.minorsCount ?? 0;
+      document.getElementById('disabledCount').value = report.disabledCount ?? 0;
       
-      const medicalCases = report ? (report.medicalCasesCount ?? 0) : 0;
-      document.getElementById('medicalCount').value = medicalCases;
-      setSelectedChips('medicalChips', report ? report.medicalConditions : '');
+      document.getElementById('medicalCount').value = report.medicalCasesCount ?? 0;
+      setSelectedChips('medicalChips', report.medicalConditions || '');
       updateMedicalChipsVisibility();
 
-      document.getElementById('dogsCount').value = report ? (report.dogsCount ?? 0) : 0;
-      document.getElementById('catsCount').value = report ? (report.catsCount ?? 0) : 0;
-
+      document.getElementById('dogsCount').value = report.dogsCount ?? 0;
+      document.getElementById('catsCount').value = report.catsCount ?? 0;
       updateTotalPeople();
 
-      // Necesidades (SI / NO)
-      updateYNUI('necWater', report ? Boolean(report.necWater) : false);
-      updateYNUI('necFood', report ? Boolean(report.necFood) : true);
-      updateYNUI('necHygiene', report ? Boolean(report.necHygiene) : true);
-      updateYNUI('necLona', report ? Boolean(report.necLona) : false);
-      updateYNUI('necCamping', report ? Boolean(report.necCamping) : false);
-      updateYNUI('necToldas', report ? Boolean(report.necToldas) : false);
-      updateYNUI('necColchonetas', report ? Boolean(report.necColchonetas) : false);
-      setSelectedChips('necOtherChips', report ? report.necOtherSupplies : '');
+      // Necesidades
+      updateYNUI('necWater', Boolean(report.necWater));
+      updateYNUI('necFood', Boolean(report.necFood));
+      updateYNUI('necHygiene', Boolean(report.necHygiene));
+      updateYNUI('necLona', Boolean(report.necLona));
+      updateYNUI('necCamping', Boolean(report.necCamping));
+      updateYNUI('necToldas', Boolean(report.necToldas));
+      updateYNUI('necColchonetas', Boolean(report.necColchonetas));
+      setSelectedChips('necOtherChips', report.necOtherSupplies || '');
 
-      // Checkbox de entregas en pendiente
-      const hasDeliveries = report && (
+      // Entregas
+      const hasDeliveries = (
         report.entWater || report.entFood || report.entHygiene || 
         report.entLona || report.entCamping || report.entToldas || 
         report.entColchonetas || (report.entOtherSupplies && report.entOtherSupplies.length > 0)
       );
       document.getElementById('checkDelivered').checked = Boolean(hasDeliveries);
 
-      // Entregas (SI / NO)
-      updateYNUI('entWater', report ? Boolean(report.entWater) : false);
-      updateYNUI('entFood', report ? Boolean(report.entFood) : false);
-      updateYNUI('entHygiene', report ? Boolean(report.entHygiene) : false);
-      updateYNUI('entLona', report ? Boolean(report.entLona) : false);
-      updateYNUI('entCamping', report ? Boolean(report.entCamping) : false);
-      updateYNUI('entToldas', report ? Boolean(report.entToldas) : false);
-      updateYNUI('entColchonetas', report ? Boolean(report.entColchonetas) : false);
-      setSelectedChips('entOtherChips', report ? report.entOtherSupplies : '');
-      document.getElementById('attendedNotes').value = report ? (report.attendedNotes || '') : '';
+      updateYNUI('entWater', Boolean(report.entWater));
+      updateYNUI('entFood', Boolean(report.entFood));
+      updateYNUI('entHygiene', Boolean(report.entHygiene));
+      updateYNUI('entLona', Boolean(report.entLona));
+      updateYNUI('entCamping', Boolean(report.entCamping));
+      updateYNUI('entToldas', Boolean(report.entToldas));
+      updateYNUI('entColchonetas', Boolean(report.entColchonetas));
+      setSelectedChips('entOtherChips', report.entOtherSupplies || '');
+      document.getElementById('attendedNotes').value = report.attendedNotes || '';
 
       handleStatusChange();
-      document.getElementById('reportModal').style.display = 'flex';
+      map.setView([report.lat, report.lng], 16);
+      setLocationInForm(report.lat, report.lng);
+    };
+
+    function resetFormToDefaults() {
+      document.getElementById('formTitle').textContent = 'Levantamiento de Auxilio';
+      document.getElementById('reportId').value = '';
+      document.getElementById('createdAt').value = '';
+      document.getElementById('attendedAt').value = '';
+      document.getElementById('photoBase64').value = '';
+      document.getElementById('photoUrl').value = '';
+      document.getElementById('photoPreviewImg').style.display = 'none';
+      document.getElementById('photoStatusText').textContent = '';
+
+      document.getElementById('statusSelect').value = 'PENDIENTE';
+      document.getElementById('prioritySelect').value = 'MEDIA';
+      document.getElementById('houseDamageSelect').value = 'MENOR / HABITABLE';
+      document.getElementById('contactName').value = '';
+      document.getElementById('contactPhone').value = '';
+
+      // Todo en 0
+      document.getElementById('adultsCount').value = 0;
+      document.getElementById('seniorsCount').value = 0;
+      document.getElementById('minorsCount').value = 0;
+      document.getElementById('disabledCount').value = 0;
+      document.getElementById('medicalCount').value = 0;
+      document.getElementById('dogsCount').value = 0;
+      document.getElementById('catsCount').value = 0;
+      updateTotalPeople();
+      updateMedicalChipsVisibility();
+
+      // Todo en NO
+      ['necWater', 'necFood', 'necHygiene', 'necLona', 'necCamping', 'necToldas', 'necColchonetas'].forEach(id => updateYNUI(id, false));
+      document.querySelectorAll('#necOtherChips .chip').forEach(c => c.classList.remove('selected'));
+
+      document.getElementById('checkDelivered').checked = false;
+      ['entWater', 'entFood', 'entHygiene', 'entLona', 'entCamping', 'entToldas', 'entColchonetas'].forEach(id => updateYNUI(id, false));
+      document.querySelectorAll('#entOtherChips .chip').forEach(c => c.classList.remove('selected'));
+      document.getElementById('attendedNotes').value = '';
+
+      handleStatusChange();
     }
-
-    window.closeModal = () => {
-      document.getElementById('reportModal').style.display = 'none';
-    };
-
-    window.editReport = async (id) => {
-      const all = await StorageService.getAllReports();
-      const report = all.find(item => item.id === id);
-      if (report) openModal(report);
-    };
 
     window.saveRecord = async () => {
       const existingId = document.getElementById('reportId').value;
@@ -1389,7 +1440,6 @@
       const totalPeople = adults + seniors + minors;
 
       const isDeliveredActive = status === 'ATENDIDO' || document.getElementById('checkDelivered').checked;
-
       const medicalCount = parseInt(document.getElementById('medicalCount').value, 10) || 0;
       const medicalConditions = medicalCount >= 1 ? getSelectedChips('medicalChips') : '';
 
@@ -1430,7 +1480,7 @@
         necColchonetas: document.getElementById('necColchonetas').value === 'true',
         necOtherSupplies: getSelectedChips('necOtherChips'),
 
-        // Entregas (Solo si el check está activo o el estado es Atendido)
+        // Entregas
         entWater: isDeliveredActive && (document.getElementById('entWater').value === 'true'),
         entFood: isDeliveredActive && (document.getElementById('entFood').value === 'true'),
         entHygiene: isDeliveredActive && (document.getElementById('entHygiene').value === 'true'),
@@ -1445,7 +1495,8 @@
       };
 
       await StorageService.saveReport(reportData);
-      closeModal();
+      alert('Reporte guardado con éxito');
+      resetFormToDefaults();
       await refreshMapAndBadges();
       triggerSync();
     };
@@ -1453,6 +1504,9 @@
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
       updateNetworkStatus();
+      const lastBrig = localStorage.getItem('lastBrigadista');
+      if (lastBrig) document.getElementById('brigadistaInput').value = lastBrig;
+      resetFormToDefaults();
     });
   </script>
 </body>
