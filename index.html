@@ -8,7 +8,6 @@
   <meta name="theme-color" content="#e0004d" />
   <link rel="apple-touch-icon" href="manifest.json" />
 
-  <!-- Leaflet CDN -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -500,14 +499,12 @@
 </head>
 <body>
 
-  <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
   <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
     📋 <span id="toggleFormText">Ocultar Formulario</span>
   </button>
 
   <div class="app-layout">
 
-    <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
     <div id="sidebarPanel" class="sidebar-panel">
       
       <div class="rotary-header">
@@ -527,7 +524,6 @@
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
-      <!-- Ubicación y Control -->
       <div class="section-title title-blue">Ubicación y Evaluación</div>
       <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
@@ -560,7 +556,6 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <!-- FOTO: Tomar Foto o Cargar Foto -->
       <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
@@ -592,7 +587,6 @@
         </div>
       </div>
 
-      <!-- Censo Poblacional (Todo en 0 por defecto) -->
       <div class="section-title title-blue">
         Censo Poblacional
         <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 0</span>
@@ -634,7 +628,6 @@
         </div>
       </div>
 
-      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -674,7 +667,6 @@
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
       <div id="sectionNeeds">
         <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
 
@@ -751,19 +743,16 @@
         </div>
       </div>
 
-      <!-- INTERRUPTOR SIMÉTRICO: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
       <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
         <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
       </div>
 
-      <!-- INTERRUPTOR SIMÉTRICO: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
       <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
         <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
       <div id="sectionDeliveries" style="display: none;">
         <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
 
@@ -846,7 +835,6 @@
       <button type="button" class="btn-submit" onclick="saveRecord()">💾 Guardar Reporte</button>
     </div>
 
-    <!-- PANEL DERECHO: MAPA LEAFLET -->
     <div class="map-panel">
       
       <div class="map-top-bar">
@@ -859,7 +847,6 @@
           <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
         </div>
 
-        <!-- Buscador Inteligente -->
         <div class="search-layer-bar">
           <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
           <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
@@ -886,9 +873,6 @@
   </div>
 
   <script>
-    // =========================================================================
-    // CONFIGURACIÓN: WEBHOOK DE GOOGLE APPS SCRIPT
-    // =========================================================================
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
     if ('serviceWorker' in navigator) {
@@ -899,31 +883,21 @@
       });
     }
 
-    // =========================================================================
-    // ÍNDICE LOCAL OFFLINE DE COMUNIDADES DE PROVINCIAS CENTRALES
-    // =========================================================================
     const LOCAL_PANAMA_PLACES = {
-      // HERRERA
       "CHITRE": [7.9625, -80.4286], "LA ARENA": [7.9714, -80.4571], "MONAGRILLO": [7.9856, -80.4189],
       "LLANO BONITO": [7.9442, -80.4411], "PARITA": [8.0028, -80.5206], "PESE": [7.8967, -80.6189],
       "OCU": [7.9347, -80.7761], "LOS POZOS": [7.8183, -80.6656], "SANTA MARIA": [8.1158, -80.6681], "LAS MINAS": [7.7972, -80.7519],
-      // LOS SANTOS
       "LAS TABLAS": [7.7667, -80.2833], "LOS SANTOS": [7.9333, -80.4167], "GUARARE": [7.8167, -80.2833],
       "PEDASI": [7.5333, -80.0333], "PLAYA VENAO": [7.4289, -80.1981], "TONOSI": [7.3500, -80.4333],
       "MACARACAS": [7.7333, -80.5333], "POCHETI": [7.7011, -80.4890],
-      // VERAGUAS
       "SANTIAGO": [8.1000, -80.9833], "ATALAYA": [8.0500, -80.9333], "CANAZAS": [8.3167, -81.2167],
       "SAN FRANCISCO": [8.2500, -80.9667], "SANTA FE": [8.5167, -81.0833], "MONTIJO": [7.9833, -81.0500],
       "SONA": [8.0167, -81.3167], "RIO DE JESUS": [7.9833, -81.1667], "CALOBRE": [8.3167, -80.8667],
       "LA MESA": [8.1500, -81.1833], "MARIATO": [7.6333, -81.0333],
-      // COCLE
       "PENONOME": [8.5167, -80.3500], "AGUADULCE": [8.2500, -80.5500], "ANTON": [8.4000, -80.2667],
       "EL VALLE": [8.6000, -80.1333], "NATA": [8.3333, -80.5167], "OLA": [8.4167, -80.6500], "RIO HATO": [8.3833, -80.1667]
     };
 
-    // =========================================================================
-    // OPEN LOCATION CODE (PLUS CODE)
-    // =========================================================================
     const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
 
     function encodePlusCode(latitude, longitude) {
@@ -999,7 +973,6 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
-    // DESCARGA ESTRICTAMENTE PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
@@ -1048,11 +1021,8 @@
       }
     };
 
-    // =========================================================================
-    // ALMACENAMIENTO LOCAL EN MEMORIA (IndexedDB)
-    // =========================================================================
     const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 12;
+    const DB_VERSION = 13;
     const STORE_NAME = 'reports';
 
     function openDatabase() {
@@ -1126,9 +1096,6 @@
       }
     };
 
-    // =========================================================================
-    // MAPA LEAFLET
-    // =========================================================================
     let map;
     let streetLayer;
     let satLayer;
@@ -1155,6 +1122,7 @@
 
       setTimeout(() => { map.invalidateSize(); }, 300);
       refreshMapAndBadges();
+      fetchGlobalReports();
     }
 
     function setLocationInForm(lat, lng) {
@@ -1258,9 +1226,6 @@
       }
     };
 
-    // =========================================================================
-    // MARCADORES Y POPUPS CON CÓDIGO DE COLOR (SINCRONIZACIÓN GLOBAL)
-    // =========================================================================
     async function refreshMapAndBadges() {
       if (!map) return;
       const allReports = await StorageService.getAllReports();
@@ -1313,11 +1278,10 @@
       });
     }
 
-    // DESCARGA DE REPORTES GLOBALES PARA QUE TODOS VEAN LOS PUNTOS DE TODOS
     async function fetchGlobalReports() {
       if (!navigator.onLine) return;
       try {
-        const res = await fetch(WEBHOOK_URL, { method: 'GET' });
+        const res = await fetch(WEBHOOK_URL + '?action=get_all');
         const json = await res.json();
         if (json && json.status === 'success' && Array.isArray(json.data)) {
           for (const item of json.data) {
@@ -1331,11 +1295,10 @@
       }
     }
 
-    // BOTÓN: SINCRONIZAR TODO (SUBE LO TUYO Y DESCARGA LO DE TODOS)
     window.syncAllDevices = async () => {
       const btn = document.getElementById('syncBtn');
       if (!navigator.onLine) {
-        alert('Necesitas conexión a internet (WiFi o datos) para sincronizar con los demás dispositivos.');
+        alert('Necesitas conexión a internet (WiFi o datos) para sincronizar.');
         return;
       }
       btn.textContent = '⏳ Sincronizando...';
@@ -1344,7 +1307,7 @@
         await fetchGlobalReports();
         btn.textContent = '✅ Actualizado';
         setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
-        alert('¡Sincronización completada! Se subieron tus datos y se descargaron los puntos de todos los brigadistas.');
+        alert('¡Sincronización completada! Se enviaron tus datos a la hoja y se descargaron los puntos de todos.');
       } catch (e) {
         btn.textContent = '❌ Error';
         setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
@@ -1352,7 +1315,6 @@
       }
     };
 
-    // SUBIDA ROBUSTA
     let isSyncing = false;
     async function triggerSync() {
       if (!navigator.onLine || isSyncing) return;
@@ -1364,10 +1326,12 @@
 
       isSyncing = true;
       try {
+        const formData = new URLSearchParams();
+        formData.append('data', JSON.stringify({ batch: pending }));
+
         const response = await fetch(WEBHOOK_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ batch: pending })
+          body: formData
         });
 
         const result = await response.json();
@@ -1383,1421 +1347,6 @@
       }
     }
 
-    // =========================================================================
-    // PROCESAMIENTO Y COMPRESIÓN DE FOTO
-    // =========================================================================
-    window.handlePhotoUpload = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const photoStatus = document.getElementById('photoStatusText');
-      photoStatus.textContent = 'Optimizando foto...';
-
-      const reader = new FileReader();
-      reader.onload = (readerEvent) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Brigada Rotary - Emergencias</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#e0004d" />
-  <link rel="apple-touch-icon" href="manifest.json" />
-
-  <!-- Leaflet CDN -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      width: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #0f172a;
-    }
-
-    .app-layout {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .sidebar-panel {
-      width: 490px;
-      min-width: 380px;
-      height: 100%;
-      background: white;
-      overflow-y: auto;
-      padding: 20px;
-      box-shadow: 4px 0 15px rgba(0,0,0,0.15);
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .sidebar-panel.collapsed {
-      transform: translateX(-100%);
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-    }
-
-    .map-panel {
-      flex: 1;
-      height: 100%;
-      position: relative;
-      background: #e2e8f0;
-    }
-
-    #map {
-      height: 100%;
-      width: 100%;
-    }
-
-    @media (max-width: 900px) {
-      .app-layout {
-        flex-direction: column-reverse;
-      }
-      .sidebar-panel {
-        width: 100%;
-        height: 60%;
-        border-radius: 20px 20px 0 0;
-      }
-      .sidebar-panel.collapsed {
-        transform: translateY(100%);
-        height: 0;
-        padding: 0;
-      }
-      .map-panel {
-        width: 100%;
-        height: 100%;
-      }
-    }
-
-    .rotary-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      border-bottom: 2px solid #f1f5f9;
-      padding-bottom: 10px;
-    }
-    .rotary-icon-badge {
-      background: #e0004d;
-      color: white;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      font-weight: 900;
-      flex-shrink: 0;
-    }
-    .rotary-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      letter-spacing: -0.5px;
-      line-height: 1.1;
-    }
-    .rotary-title span {
-      color: #e0004d;
-    }
-
-    .btn-toggle-form {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 1100;
-      background: #0f172a;
-      color: white;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 7px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .map-top-bar {
-      position: absolute;
-      top: 10px;
-      left: 175px;
-      right: 10px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      pointer-events: none;
-    }
-    @media (max-width: 900px) {
-      .map-top-bar {
-        left: 10px;
-        top: 50px;
-      }
-    }
-
-    .badge-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      pointer-events: auto;
-    }
-    .badge {
-      padding: 5px 10px;
-      border-radius: 18px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .badge-online { background-color: #16a34a; }
-    .badge-offline { background-color: #dc2626; }
-    .badge-sync { background-color: #0284c7; cursor: pointer; }
-    .badge-stats { background-color: #334155; }
-    .badge-download {
-      background-color: #7c3aed;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-
-    .search-layer-bar {
-      display: flex;
-      gap: 6px;
-      max-width: 480px;
-      pointer-events: auto;
-    }
-    .input-search {
-      flex: 1;
-      padding: 7px 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 12px;
-      background: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      font-weight: 600;
-    }
-    .btn-action {
-      padding: 7px 12px;
-      background: #0284c7;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 11px;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    }
-    .layer-selector {
-      display: flex;
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    }
-    .layer-btn {
-      padding: 7px 10px;
-      border: none;
-      background: #f8fafc;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      color: #475569;
-    }
-    .layer-btn.active {
-      background: #0f172a;
-      color: white;
-    }
-
-    .btn-gps {
-      position: absolute;
-      bottom: 70px;
-      right: 16px;
-      z-index: 1000;
-      background: #0284c7;
-      color: white;
-      border: none;
-      border-radius: 30px;
-      padding: 10px 16px;
-      font-weight: 700;
-      font-size: 13px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .filter-bar {
-      position: absolute;
-      bottom: 15px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      display: flex;
-      background: white;
-      border-radius: 30px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.25);
-      padding: 3px;
-    }
-    .filter-btn {
-      padding: 6px 14px;
-      border: none;
-      background: transparent;
-      font-size: 12px;
-      font-weight: 700;
-      border-radius: 20px;
-      cursor: pointer;
-      color: #475569;
-    }
-    .filter-btn.active {
-      background: #0284c7;
-      color: white;
-    }
-
-    .section-title {
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-      margin: 14px 0 8px 0;
-      letter-spacing: 0.5px;
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 4px;
-    }
-    .title-blue { color: #0284c7; border-color: #bae6fd; }
-    .title-amber { color: #d97706; border-color: #fde68a; }
-    .title-green { color: #16a34a; border-color: #bbf7d0; }
-
-    .form-label {
-      display: block;
-      font-size: 11px;
-      font-weight: 700;
-      color: #475569;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-    }
-    .form-control {
-      width: 100%;
-      padding: 10px 12px;
-      margin-bottom: 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 14px;
-      background: #f8fafc;
-      font-weight: 600;
-    }
-    .pluscode-badge {
-      display: inline-block;
-      background: #e0f2fe;
-      color: #0369a1;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-weight: 800;
-      font-family: monospace;
-      font-size: 13px;
-      margin-bottom: 8px;
-    }
-    .row-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .counter-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #f1f5f9;
-      border-radius: 10px;
-      padding: 6px 12px;
-      margin-bottom: 8px;
-    }
-    .counter-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #1e293b;
-    }
-    .counter-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .counter-btn {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      background: white;
-      font-size: 18px;
-      font-weight: bold;
-      color: #0f172a;
-      cursor: pointer;
-    }
-    .counter-input {
-      width: 60px;
-      height: 34px;
-      text-align: center;
-      font-size: 15px;
-      font-weight: 800;
-      color: #0284c7;
-      background: white;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 0 4px;
-      -moz-appearance: textfield;
-    }
-    .counter-input::-webkit-outer-spin-button,
-    .counter-input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
-    .yn-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 7px 12px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      margin-bottom: 6px;
-    }
-    .yn-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #334155;
-    }
-    .yn-toggles {
-      display: flex;
-      gap: 4px;
-    }
-    .yn-btn {
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-      background: white;
-      font-size: 12px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .yn-btn.yes.active { background: #d97706; color: white; border-color: #d97706; }
-    .yn-btn.yes-green.active { background: #16a34a; color: white; border-color: #16a34a; }
-    .yn-btn.no.active { background: #64748b; color: white; border-color: #64748b; }
-
-    .chip-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 6px 0 10px 0;
-    }
-    .chip {
-      padding: 6px 11px;
-      border-radius: 14px;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      font-size: 12px;
-      font-weight: 600;
-      color: #475569;
-      cursor: pointer;
-      user-select: none;
-    }
-    .chip.selected {
-      background: #0284c7;
-      color: white;
-      border-color: #0284c7;
-    }
-
-    .photo-box {
-      border: 2px dashed #cbd5e1;
-      border-radius: 10px;
-      padding: 10px;
-      text-align: center;
-      background: #f8fafc;
-      margin-bottom: 12px;
-    }
-    .photo-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-    }
-    .photo-preview {
-      width: 100%;
-      max-height: 140px;
-      object-fit: cover;
-      border-radius: 8px;
-      margin-top: 6px;
-      display: none;
-    }
-
-    .toggle-subbox {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin: 12px 0;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 13px;
-    }
-    .box-amber { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
-    .box-green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-
-    .btn-submit {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 10px;
-      background: #e0004d;
-      color: white;
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      margin-top: 15px;
-      box-shadow: 0 4px 10px rgba(224,0,77,0.3);
-    }
-
-    .popup-card {
-      font-size: 13px;
-      line-height: 1.4;
-      min-width: 210px;
-    }
-    .popup-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 800;
-      font-size: 10px;
-      color: white;
-      margin-bottom: 6px;
-    }
-    .popup-pending { background-color: #dc2626; }
-    .popup-attended { background-color: #16a34a; }
-  </style>
-</head>
-<body>
-
-  <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
-  <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
-    📋 <span id="toggleFormText">Ocultar Formulario</span>
-  </button>
-
-  <div class="app-layout">
-
-    <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
-    <div id="sidebarPanel" class="sidebar-panel">
-      
-      <div class="rotary-header">
-        <div class="rotary-icon-badge">⚙️</div>
-        <div>
-          <h1 class="rotary-title">Brigada <span>Rotary</span></h1>
-          <p style="font-size: 11px; color: #64748b; font-weight: 600;">Censo y Auxilio en Emergencias</p>
-        </div>
-      </div>
-
-      <input type="hidden" id="reportId" />
-      <input type="hidden" id="createdAt" />
-      <input type="hidden" id="attendedAt" />
-      <input type="hidden" id="lat" value="7.965" />
-      <input type="hidden" id="lng" value="-80.432" />
-      <input type="hidden" id="plusCode" value="764R6FW7+C8" />
-      <input type="hidden" id="photoBase64" />
-      <input type="hidden" id="photoUrl" />
-
-      <!-- Ubicación y Control -->
-      <div class="section-title title-blue">Ubicación y Evaluación</div>
-      <div>
-        <span class="form-label" style="display:inline;">Plus Code:</span>
-        <span id="plusCodeDisplay" class="pluscode-badge">764R6FW7+C8</span>
-      </div>
-
-      <div class="row-2">
-        <div>
-          <label class="form-label">Estado</label>
-          <select id="statusSelect" class="form-control" onchange="handleStatusChange()">
-            <option value="PENDIENTE" selected>Pendiente (Rojo)</option>
-            <option value="ATENDIDO">Atendido (Verde)</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">Prioridad</label>
-          <select id="prioritySelect" class="form-control">
-            <option value="MEDIA" selected>Media</option>
-            <option value="ALTA">Alta / Urgente</option>
-            <option value="BAJA">Baja</option>
-          </select>
-        </div>
-      </div>
-
-      <label class="form-label">Afectación de Vivienda</label>
-      <select id="houseDamageSelect" class="form-control">
-        <option value="MENOR / HABITABLE" selected>Daño menor (Habitable)</option>
-        <option value="NINGUNO">Sin daño aparente</option>
-        <option value="GRAVE / PARCIAL">Daño grave / parcial (Riesgo)</option>
-        <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
-      </select>
-
-      <!-- FOTO: Tomar Foto o Cargar Foto -->
-      <label class="form-label">Foto de la Vivienda (Opcional)</label>
-      <div class="photo-box">
-        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
-        <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)" />
-
-        <div class="photo-actions">
-          <button type="button" class="btn-action" style="background:#e0004d;" onclick="document.getElementById('cameraInput').click()">
-            📷 Tomar Foto
-          </button>
-          <button type="button" class="btn-action" style="background:#475569;" onclick="document.getElementById('galleryInput').click()">
-            📁 Cargar Foto
-          </button>
-        </div>
-        <img id="photoPreviewImg" class="photo-preview" />
-        <div id="photoStatusText" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
-      </div>
-
-      <label class="form-label">Brigadista Responsable</label>
-      <input type="text" id="brigadistaInput" class="form-control" placeholder="Tu nombre" />
-
-      <div class="row-2">
-        <div>
-          <label class="form-label">Contacto / Jefe Hogar</label>
-          <input type="text" id="contactName" class="form-control" placeholder="Nombre completo" />
-        </div>
-        <div>
-          <label class="form-label">Teléfono / WhatsApp</label>
-          <input type="tel" id="contactPhone" class="form-control" placeholder="6000-0000" />
-        </div>
-      </div>
-
-      <!-- Censo Poblacional (Todo en 0 por defecto) -->
-      <div class="section-title title-blue">
-        Censo Poblacional
-        <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 0</span>
-      </div>
-      
-      <div class="counter-row">
-        <span class="counter-title">Adultos (18 a 59)</span>
-        <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', -1)">-</button>
-          <input type="number" id="adultsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
-          <button type="button" class="counter-btn" onclick="adjustInput('adultsCount', 1)">+</button>
-        </div>
-      </div>
-
-      <div class="counter-row">
-        <span class="counter-title">Adultos Mayores (60+)</span>
-        <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjustInput('seniorsCount', -1)">-</button>
-          <input type="number" id="seniorsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
-          <button type="button" class="counter-btn" onclick="adjustInput('seniorsCount', 1)">+</button>
-        </div>
-      </div>
-
-      <div class="counter-row">
-        <span class="counter-title">Menores / Niños / Bebés</span>
-        <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjustInput('minorsCount', -1)">-</button>
-          <input type="number" id="minorsCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateTotalPeople();" />
-          <button type="button" class="counter-btn" onclick="adjustInput('minorsCount', 1)">+</button>
-        </div>
-      </div>
-
-      <div class="counter-row">
-        <span class="counter-title">Personas con Discapacidad</span>
-        <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjustInput('disabledCount', -1)">-</button>
-          <input type="number" id="disabledCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
-          <button type="button" class="counter-btn" onclick="adjustInput('disabledCount', 1)">+</button>
-        </div>
-      </div>
-
-      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
-      <div class="counter-row">
-        <span class="counter-title">Casos Médicos / Heridos</span>
-        <div class="counter-controls">
-          <button type="button" class="counter-btn" onclick="adjustMedicalCount(-1)">-</button>
-          <input type="number" id="medicalCount" class="counter-input" min="0" value="0" oninput="validateInput(this); updateMedicalChipsVisibility();" />
-          <button type="button" class="counter-btn" onclick="adjustMedicalCount(1)">+</button>
-        </div>
-      </div>
-
-      <div id="medicalChipsBox" style="display: none;">
-        <label class="form-label" style="font-size: 11px; color: #64748b;">Condiciones Médicas:</label>
-        <div class="chip-container" id="medicalChips">
-          <span class="chip" onclick="toggleChip(this)">Insulina / Diabético</span>
-          <span class="chip" onclick="toggleChip(this)">Hipertenso</span>
-          <span class="chip" onclick="toggleChip(this)">Movilidad reducida</span>
-          <span class="chip" onclick="toggleChip(this)">Herida / Trauma</span>
-          <span class="chip" onclick="toggleChip(this)">Embarazada</span>
-        </div>
-      </div>
-
-      <div class="row-2">
-        <div class="counter-row">
-          <span class="counter-title">Perros</span>
-          <div class="counter-controls">
-            <button type="button" class="counter-btn" onclick="adjustInput('dogsCount', -1)">-</button>
-            <input type="number" id="dogsCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
-            <button type="button" class="counter-btn" onclick="adjustInput('dogsCount', 1)">+</button>
-          </div>
-        </div>
-        <div class="counter-row">
-          <span class="counter-title">Gatos</span>
-          <div class="counter-controls">
-            <button type="button" class="counter-btn" onclick="adjustInput('catsCount', -1)">-</button>
-            <input type="number" id="catsCount" class="counter-input" min="0" value="0" oninput="validateInput(this)" />
-            <button type="button" class="counter-btn" onclick="adjustInput('catsCount', 1)">+</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
-      <div id="sectionNeeds">
-        <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
-
-        <div class="yn-row">
-          <span class="yn-title">Agua Potable</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necWater', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necWater', false, this)">NO</button>
-            <input type="hidden" id="necWater" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Kit de Alimentos</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necFood', false, this)">NO</button>
-            <input type="hidden" id="necFood" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Kit de Higiene</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necHygiene', false, this)">NO</button>
-            <input type="hidden" id="necHygiene" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Lona</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necLona', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necLona', false, this)">NO</button>
-            <input type="hidden" id="necLona" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Camping</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necCamping', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necCamping', false, this)">NO</button>
-            <input type="hidden" id="necCamping" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Toldas / Carpas</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necToldas', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necToldas', false, this)">NO</button>
-            <input type="hidden" id="necToldas" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">Colchonetas</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes" onclick="setYN('necColchonetas', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('necColchonetas', false, this)">NO</button>
-            <input type="hidden" id="necColchonetas" value="false" />
-          </div>
-        </div>
-
-        <label class="form-label" style="margin-top: 8px;">Otros Insumos Requeridos (Opcional)</label>
-        <div class="chip-container" id="necOtherChips">
-          <span class="chip" onclick="toggleChip(this)">Palets</span>
-          <span class="chip" onclick="toggleChip(this)">Pañales Bebé</span>
-          <span class="chip" onclick="toggleChip(this)">Pañales Adulto</span>
-          <span class="chip" onclick="toggleChip(this)">Frazadas</span>
-          <span class="chip" onclick="toggleChip(this)">Ropa</span>
-        </div>
-      </div>
-
-      <!-- INTERRUPTOR SIMÉTRICO: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
-      <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
-        <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
-        <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
-      </div>
-
-      <!-- INTERRUPTOR SIMÉTRICO: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
-      <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
-        <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
-        <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
-      </div>
-
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
-      <div id="sectionDeliveries" style="display: none;">
-        <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregó Agua?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entWater', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entWater', false, this)">NO</button>
-            <input type="hidden" id="entWater" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregó Kit Alimento?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entFood', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entFood', false, this)">NO</button>
-            <input type="hidden" id="entFood" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregó Kit Higiene?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entHygiene', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entHygiene', false, this)">NO</button>
-            <input type="hidden" id="entHygiene" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregó Lona?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entLona', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entLona', false, this)">NO</button>
-            <input type="hidden" id="entLona" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregó Camping?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entCamping', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entCamping', false, this)">NO</button>
-            <input type="hidden" id="entCamping" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregaron Toldas?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entToldas', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entToldas', false, this)">NO</button>
-            <input type="hidden" id="entToldas" value="false" />
-          </div>
-        </div>
-
-        <div class="yn-row">
-          <span class="yn-title">¿Se entregaron Colchonetas?</span>
-          <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green" onclick="setYN('entColchonetas', true, this)">SÍ</button>
-            <button type="button" class="yn-btn no active" onclick="setYN('entColchonetas', false, this)">NO</button>
-            <input type="hidden" id="entColchonetas" value="false" />
-          </div>
-        </div>
-
-        <label class="form-label" style="margin-top: 8px;">Otros Insumos Entregados (Opcional)</label>
-        <div class="chip-container" id="entOtherChips">
-          <span class="chip" onclick="toggleChip(this)">Palets</span>
-          <span class="chip" onclick="toggleChip(this)">Pañales Bebé</span>
-          <span class="chip" onclick="toggleChip(this)">Pañales Adulto</span>
-          <span class="chip" onclick="toggleChip(this)">Frazadas</span>
-          <span class="chip" onclick="toggleChip(this)">Ropa</span>
-        </div>
-
-        <label class="form-label">Observaciones de Atención (Opcional)</label>
-        <input type="text" id="attendedNotes" class="form-control" placeholder="Ej: Se entregó lona..." />
-      </div>
-
-      <button type="button" class="btn-submit" onclick="saveRecord()">💾 Guardar Reporte</button>
-    </div>
-
-    <!-- PANEL DERECHO: MAPA LEAFLET -->
-    <div class="map-panel">
-      
-      <div class="map-top-bar">
-        <div class="badge-group">
-          <span id="connBadge" class="badge badge-online">En línea</span>
-          <span id="syncBtn" class="badge badge-sync" onclick="syncAllDevices()" title="Presiona para subir tus puntos y descargar los de todos">🔄 Sincronizar Todo</span>
-          <span id="syncBadge" class="badge badge-stats">0 pendientes</span>
-          <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
-          <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
-        </div>
-
-        <!-- Buscador Inteligente -->
-        <div class="search-layer-bar">
-          <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
-          <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
-          <div class="layer-selector">
-            <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
-            <button type="button" id="btnLayerSat" class="layer-btn" onclick="switchLayer('sat')">Satélite</button>
-          </div>
-        </div>
-      </div>
-
-      <button type="button" class="btn-gps" onclick="goToMyLocation()">
-        📍 Mi Ubicación
-      </button>
-
-      <div class="filter-bar">
-        <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
-        <button class="filter-btn" onclick="setFilter('PENDIENTE', event)">Pendientes (Rojo)</button>
-        <button class="filter-btn" onclick="setFilter('ATENDIDO', event)">Atendidos (Verde)</button>
-      </div>
-
-      <div id="map"></div>
-    </div>
-
-  </div>
-
-  <script>
-    // =========================================================================
-    // CONFIGURACIÓN: WEBHOOK DE GOOGLE APPS SCRIPT
-    // =========================================================================
-    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(() => console.log('SW offline listo'))
-          .catch((err) => console.warn('Aviso SW:', err));
-      });
-    }
-
-    // =========================================================================
-    // ÍNDICE LOCAL OFFLINE DE COMUNIDADES DE PROVINCIAS CENTRALES
-    // =========================================================================
-    const LOCAL_PANAMA_PLACES = {
-      // HERRERA
-      "CHITRE": [7.9625, -80.4286], "LA ARENA": [7.9714, -80.4571], "MONAGRILLO": [7.9856, -80.4189],
-      "LLANO BONITO": [7.9442, -80.4411], "PARITA": [8.0028, -80.5206], "PESE": [7.8967, -80.6189],
-      "OCU": [7.9347, -80.7761], "LOS POZOS": [7.8183, -80.6656], "SANTA MARIA": [8.1158, -80.6681], "LAS MINAS": [7.7972, -80.7519],
-      // LOS SANTOS
-      "LAS TABLAS": [7.7667, -80.2833], "LOS SANTOS": [7.9333, -80.4167], "GUARARE": [7.8167, -80.2833],
-      "PEDASI": [7.5333, -80.0333], "PLAYA VENAO": [7.4289, -80.1981], "TONOSI": [7.3500, -80.4333],
-      "MACARACAS": [7.7333, -80.5333], "POCHETI": [7.7011, -80.4890],
-      // VERAGUAS
-      "SANTIAGO": [8.1000, -80.9833], "ATALAYA": [8.0500, -80.9333], "CANAZAS": [8.3167, -81.2167],
-      "SAN FRANCISCO": [8.2500, -80.9667], "SANTA FE": [8.5167, -81.0833], "MONTIJO": [7.9833, -81.0500],
-      "SONA": [8.0167, -81.3167], "RIO DE JESUS": [7.9833, -81.1667], "CALOBRE": [8.3167, -80.8667],
-      "LA MESA": [8.1500, -81.1833], "MARIATO": [7.6333, -81.0333],
-      // COCLE
-      "PENONOME": [8.5167, -80.3500], "AGUADULCE": [8.2500, -80.5500], "ANTON": [8.4000, -80.2667],
-      "EL VALLE": [8.6000, -80.1333], "NATA": [8.3333, -80.5167], "OLA": [8.4167, -80.6500], "RIO HATO": [8.3833, -80.1667]
-    };
-
-    // =========================================================================
-    // OPEN LOCATION CODE (PLUS CODE)
-    // =========================================================================
-    const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
-
-    function encodePlusCode(latitude, longitude) {
-      try {
-        let lat = Math.min(Math.max(latitude, -90), 90) + 90;
-        let lng = longitude;
-        while (lng < -180) lng += 360;
-        while (lng >= 180) lng -= 360;
-        lng += 180;
-
-        let code = "";
-        let latVal = lat;
-        let lngVal = lng;
-        let latGrid = 20.0;
-        let lngGrid = 20.0;
-
-        for (let i = 0; i < 4; i++) {
-          let latDigit = Math.floor(latVal / latGrid);
-          let lngDigit = Math.floor(lngVal / lngGrid);
-          latVal -= latDigit * latGrid;
-          lngVal -= lngDigit * lngGrid;
-          code += OLC_ALPHABET.charAt(latDigit) + OLC_ALPHABET.charAt(lngDigit);
-          latGrid /= 20.0;
-          lngGrid /= 20.0;
-        }
-        code = code.substring(0, 8) + "+" + code.substring(8);
-        let latDigit = Math.floor(latVal / latGrid);
-        let lngDigit = Math.floor(lngVal / lngGrid);
-        code += OLC_ALPHABET.charAt(latDigit) + OLC_ALPHABET.charAt(lngDigit);
-        return code;
-      } catch (e) {
-        return "N/A";
-      }
-    }
-
-    function decodePlusCode(code) {
-      let clean = code.replace("+", "").trim().toUpperCase();
-      if (clean.length < 8) return null;
-
-      let latVal = -90.0;
-      let lngVal = -180.0;
-      let latGrid = 20.0;
-      let lngGrid = 20.0;
-
-      for (let i = 0; i < Math.min(clean.length, 10); i += 2) {
-        let d1 = OLC_ALPHABET.indexOf(clean[i]);
-        let d2 = OLC_ALPHABET.indexOf(clean[i + 1]);
-        if (d1 === -1 || d2 === -1) return null;
-        latVal += d1 * latGrid;
-        lngVal += d2 * lngGrid;
-        latGrid /= 20.0;
-        lngGrid /= 20.0;
-      }
-
-      let latCenter = latVal + (latGrid * 20.0 / 2.0);
-      let lngCenter = lngVal + (lngGrid * 20.0 / 2.0);
-      return { lat: latCenter, lng: lngCenter };
-    }
-
-    window.toggleFormVisibility = () => {
-      const panel = document.getElementById('sidebarPanel');
-      const text = document.getElementById('toggleFormText');
-      panel.classList.toggle('collapsed');
-      const isCollapsed = panel.classList.contains('collapsed');
-      text.textContent = isCollapsed ? 'Ver Formulario' : 'Ocultar Formulario';
-      setTimeout(() => { map.invalidateSize(); }, 350);
-    };
-
-    function lon2tile(lon, zoom) {
-      return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom));
-    }
-    function lat2tile(lat, zoom) {
-      return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
-    }
-
-    // DESCARGA ESTRICTAMENTE PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
-    window.downloadCentralProvincesMap = async () => {
-      const btn = document.getElementById('btnDownloadRegion');
-      if (!navigator.onLine) {
-        alert('Se requiere conexión a internet para descargar el mapa de Provincias Centrales.');
-        return;
-      }
-
-      btn.textContent = '⏳ Descargando...';
-      const minLat = 7.2, minLon = -81.8, maxLat = 8.9, maxLon = -80.0;
-      const tileUrls = [];
-
-      for (let z = 9; z <= 12; z++) {
-        const xMin = lon2tile(minLon, z);
-        const xMax = lon2tile(maxLon, z);
-        const yMin = lat2tile(maxLat, z);
-        const yMax = lat2tile(minLat, z);
-
-        for (let x = xMin; x <= xMax; x++) {
-          for (let y = yMin; y <= yMax; y++) {
-            tileUrls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
-          }
-        }
-      }
-
-      try {
-        const cache = await caches.open('osm-tiles-offline-v1');
-        let done = 0;
-        for (const url of tileUrls) {
-          try {
-            const hasMatch = await cache.match(url);
-            if (!hasMatch) {
-              const res = await fetch(url, { mode: 'cors' });
-              if (res.ok) await cache.put(url, res);
-            }
-          } catch (e) {}
-          done++;
-          if (done % 50 === 0) {
-            btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}%`;
-          }
-        }
-        btn.textContent = '✅ Mapa Guardado';
-        alert('¡Mapa de Provincias Centrales (Herrera, Los Santos, Veraguas y Coclé) guardado con éxito!');
-      } catch (err) {
-        btn.textContent = '❌ Error descarga';
-        alert('Error descargando mapa: ' + err.message);
-      }
-    };
-
-    // =========================================================================
-    // ALMACENAMIENTO LOCAL EN MEMORIA (IndexedDB)
-    // =========================================================================
-    const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 12;
-    const STORE_NAME = 'reports';
-
-    function openDatabase() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            store.createIndex('syncStatus', 'syncStatus', { unique: false });
-          }
-        };
-        req.onsuccess = (e) => resolve(e.target.result);
-        req.onerror = (e) => reject(e.target.error);
-      });
-    }
-
-    const StorageService = {
-      async saveReport(data) {
-        const db = await openDatabase();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([STORE_NAME], 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.put(data);
-          req.onsuccess = () => resolve(data);
-          req.onerror = (e) => reject(e.target.error);
-        });
-      },
-
-      async getAllReports() {
-        const db = await openDatabase();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([STORE_NAME], 'readonly');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.getAll();
-          req.onsuccess = () => resolve(req.result || []);
-          req.onerror = (e) => reject(e.target.error);
-        });
-      },
-
-      async getPendingReports() {
-        const db = await openDatabase();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([STORE_NAME], 'readonly');
-          const index = tx.objectStore(STORE_NAME).index('syncStatus');
-          const req = index.getAll('PENDING');
-          req.onsuccess = () => resolve(req.result || []);
-          req.onerror = (e) => reject(e.target.error);
-        });
-      },
-
-      async markAsSynced(ids) {
-        const db = await openDatabase();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([STORE_NAME], 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          ids.forEach((id) => {
-            const req = store.get(id);
-            req.onsuccess = () => {
-              if (req.result) {
-                const item = req.result;
-                item.syncStatus = 'SYNCED';
-                delete item.photoBase64;
-                store.put(item);
-              }
-            };
-          });
-          tx.oncomplete = () => resolve(true);
-          tx.onerror = (e) => reject(e.target.error);
-        });
-      }
-    };
-
-    // =========================================================================
-    // MAPA LEAFLET
-    // =========================================================================
-    let map;
-    let streetLayer;
-    let satLayer;
-    let layerPending;
-    let layerAttended;
-    let currentMarker = null;
-
-    function initMap() {
-      streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-      satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
-
-      map = L.map('map', {
-        zoomControl: false,
-        attributionControl: false,
-        layers: [streetLayer]
-      }).setView([7.965, -80.432], 11);
-
-      layerPending = L.layerGroup().addTo(map);
-      layerAttended = L.layerGroup().addTo(map);
-
-      map.on('click', (e) => {
-        setLocationInForm(e.latlng.lat, e.latlng.lng);
-      });
-
-      setTimeout(() => { map.invalidateSize(); }, 300);
-      refreshMapAndBadges();
-    }
-
-    function setLocationInForm(lat, lng) {
-      const code = encodePlusCode(lat, lng);
-      document.getElementById('lat').value = lat;
-      document.getElementById('lng').value = lng;
-      document.getElementById('plusCode').value = code;
-      document.getElementById('plusCodeDisplay').textContent = code;
-
-      if (currentMarker) map.removeLayer(currentMarker);
-      currentMarker = L.marker([lat, lng]).addTo(map);
-
-      const panel = document.getElementById('sidebarPanel');
-      if (panel.classList.contains('collapsed')) {
-        document.getElementById('toggleFormText').textContent = 'Ver Formulario (Punto fijado)';
-      }
-    }
-
-    window.switchLayer = (type) => {
-      document.getElementById('btnLayerStreet').classList.toggle('active', type === 'street');
-      document.getElementById('btnLayerSat').classList.toggle('active', type === 'sat');
-
-      if (type === 'sat') {
-        map.removeLayer(streetLayer);
-        map.addLayer(satLayer);
-      } else {
-        map.removeLayer(satLayer);
-        map.addLayer(streetLayer);
-      }
-    };
-
-    window.goToMyLocation = () => {
-      if (!navigator.geolocation) {
-        alert('Geolocalización no soportada.');
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          map.setView([lat, lng], 17);
-          setLocationInForm(lat, lng);
-        },
-        (err) => {
-          alert('No se pudo obtener ubicación GPS: ' + err.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    };
-
-    window.handleSmartSearch = async () => {
-      const term = document.getElementById('smartSearchInput').value.trim();
-      if (!term) return;
-
-      const coords = decodePlusCode(term);
-      if (coords) {
-        map.setView([coords.lat, coords.lng], 17);
-        setLocationInForm(coords.lat, coords.lng);
-        return;
-      }
-
-      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      for (const [name, coord] of Object.entries(LOCAL_PANAMA_PLACES)) {
-        if (name.includes(upperTerm) || upperTerm.includes(name)) {
-          map.setView(coord, 15);
-          setLocationInForm(coord[0], coord[1]);
-          return;
-        }
-      }
-
-      if (navigator.onLine) {
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=pa&q=${encodeURIComponent(term)}`);
-          const data = await res.json();
-          if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            map.setView([lat, lon], 15);
-            setLocationInForm(lat, lon);
-            return;
-          }
-        } catch (e) {}
-      }
-
-      alert('No se encontró la ubicación. Intenta con un Plus Code o nombre de comunidad (ej: Chitré, Las Tablas, Penonomé, Pesé).');
-    };
-
-    window.setFilter = (filter, ev) => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      ev.target.classList.add('active');
-
-      if (filter === 'ALL') {
-        map.addLayer(layerPending);
-        map.addLayer(layerAttended);
-      } else if (filter === 'PENDIENTE') {
-        map.addLayer(layerPending);
-        map.removeLayer(layerAttended);
-      } else if (filter === 'ATENDIDO') {
-        map.removeLayer(layerPending);
-        map.addLayer(layerAttended);
-      }
-    };
-
-    // =========================================================================
-    // MARCADORES Y POPUPS CON CÓDIGO DE COLOR (SINCRONIZACIÓN GLOBAL)
-    // =========================================================================
-    async function refreshMapAndBadges() {
-      if (!map) return;
-      const allReports = await StorageService.getAllReports();
-      const pending = allReports.filter(r => r.syncStatus === 'PENDING');
-      
-      document.getElementById('syncBadge').textContent = `${pending.length} pendientes`;
-      document.getElementById('placesBadge').textContent = `🏠 ${allReports.length} Lugares`;
-      const totalPeople = allReports.reduce((sum, r) => sum + (Number(r.totalPeople) || 0), 0);
-      document.getElementById('peopleBadge').textContent = `👥 ${totalPeople} Personas`;
-
-      layerPending.clearLayers();
-      layerAttended.clearLayers();
-
-      allReports.forEach(r => {
-        const isAttended = r.status === 'ATENDIDO';
-        const markerColor = isAttended ? '#16a34a' : '#dc2626';
-
-        const marker = L.circleMarker([r.lat, r.lng], {
-          radius: 10,
-          fillColor: markerColor,
-          color: '#ffffff',
-          weight: 2,
-          fillOpacity: 0.95
-        });
-
-        marker.bindPopup(`
-          <div class="popup-card">
-            <span class="popup-badge ${isAttended ? 'popup-attended' : 'popup-pending'}">
-              ${isAttended ? 'ATENDIDO' : 'PENDIENTE'} - ${r.priority}
-            </span>
-            <p><b>Contacto:</b> ${r.contactName || 'No especificado'}</p>
-            <p><b>Tel:</b> ${r.contactPhone || 'N/A'}</p>
-            <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
-            <p><b>Daño Casa:</b> ${r.houseDamage}</p>
-            <p><b>Afectados:</b> ${r.totalPeople} personas (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
-            ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
-            ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
-            ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
-            <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
-              📝 Cargar en Formulario
-            </button>
-          </div>
-        `);
-
-        if (isAttended) {
-          layerAttended.addLayer(marker);
-        } else {
-          layerPending.addLayer(marker);
-        }
-      });
-    }
-
-    // DESCARGA DE REPORTES GLOBALES PARA QUE TODOS VEAN LOS PUNTOS DE TODOS
-    async function fetchGlobalReports() {
-      if (!navigator.onLine) return;
-      try {
-        const res = await fetch(WEBHOOK_URL, { method: 'GET' });
-        const json = await res.json();
-        if (json && json.status === 'success' && Array.isArray(json.data)) {
-          for (const item of json.data) {
-            item.syncStatus = 'SYNCED';
-            await StorageService.saveReport(item);
-          }
-          await refreshMapAndBadges();
-        }
-      } catch (err) {
-        console.log('Esperando conexión para descarga global de reportes.');
-      }
-    }
-
-    // BOTÓN: SINCRONIZAR TODO (SUBE LO TUYO Y DESCARGA LO DE TODOS)
-    window.syncAllDevices = async () => {
-      const btn = document.getElementById('syncBtn');
-      if (!navigator.onLine) {
-        alert('Necesitas conexión a internet (WiFi o datos) para sincronizar con los demás dispositivos.');
-        return;
-      }
-      btn.textContent = '⏳ Sincronizando...';
-      try {
-        await triggerSync();
-        await fetchGlobalReports();
-        btn.textContent = '✅ Actualizado';
-        setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
-        alert('¡Sincronización completada! Se subieron tus datos y se descargaron los puntos de todos los brigadistas.');
-      } catch (e) {
-        btn.textContent = '❌ Error';
-        setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
-        alert('Error al sincronizar: ' + e.message);
-      }
-    };
-
-    // SUBIDA ROBUSTA
-    let isSyncing = false;
-    async function triggerSync() {
-      if (!navigator.onLine || isSyncing) return;
-      const pending = await StorageService.getPendingReports();
-      if (pending.length === 0) {
-        await fetchGlobalReports();
-        return;
-      }
-
-      isSyncing = true;
-      try {
-        const response = await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ batch: pending })
-        });
-
-        const result = await response.json();
-        if (result && result.status === 'success') {
-          await StorageService.markAsSynced(pending.map(p => p.id));
-          await refreshMapAndBadges();
-          await fetchGlobalReports();
-        }
-      } catch (err) {
-        console.warn('Fallo en sincronización:', err);
-      } finally {
-        isSyncing = false;
-      }
-    }
-
-    // =========================================================================
-    // PROCESAMIENTO Y COMPRESIÓN DE FOTO
-    // =========================================================================
     window.handlePhotoUpload = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2840,9 +1389,6 @@
       reader.readAsDataURL(file);
     };
 
-    // =========================================================================
-    // CONTROLES DEL FORMULARIO Y REACTIVIDAD
-    // =========================================================================
     window.adjustInput = (id, delta) => {
       const input = document.getElementById(id);
       let val = parseInt(input.value, 10) || 0;
@@ -3170,7 +1716,6 @@
       };
 
       await StorageService.saveReport(reportData);
-      alert('Reporte guardado con éxito.');
       resetFormToDefaults();
       await refreshMapAndBadges();
       triggerSync();
