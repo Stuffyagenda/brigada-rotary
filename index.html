@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Brigada Rotary - Emergencias</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#e0004d" />
-  <link rel="apple-touch-icon" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -71,6 +71,7 @@
       }
       .sidebar-panel {
         width: 100%;
+        min-width: 0;
         height: 60%;
         border-radius: 20px 20px 0 0;
       }
@@ -81,7 +82,8 @@
       }
       .map-panel {
         width: 100%;
-        height: 100%;
+        height: 40%;
+        min-height: 0;
       }
     }
 
@@ -573,7 +575,7 @@
             📁 Cargar Foto
           </button>
         </div>
-        <img id="photoPreviewImg" class="photo-preview" />
+        <img id="photoPreviewImg" class="photo-preview" alt="Vista previa de la foto de la vivienda" />
         <div id="photoStatusText" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
       </div>
 
@@ -688,7 +690,7 @@
         <div class="yn-row">
           <span class="yn-title">Kit de Alimentos</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes" onclick="setYN('necFood', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('necFood', false, this)">NO</button>
             <input type="hidden" id="necFood" value="false" />
           </div>
@@ -697,7 +699,7 @@
         <div class="yn-row">
           <span class="yn-title">Kit de Higiene</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes active" onclick="setYN('necHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes" onclick="setYN('necHygiene', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('necHygiene', false, this)">NO</button>
             <input type="hidden" id="necHygiene" value="false" />
           </div>
@@ -776,7 +778,7 @@
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Alimento?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entFood', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes-green" onclick="setYN('entFood', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('entFood', false, this)">NO</button>
             <input type="hidden" id="entFood" value="false" />
           </div>
@@ -785,7 +787,7 @@
         <div class="yn-row">
           <span class="yn-title">¿Se entregó Kit Higiene?</span>
           <div class="yn-toggles">
-            <button type="button" class="yn-btn yes-green active" onclick="setYN('entHygiene', true, this)">SÍ</button>
+            <button type="button" class="yn-btn yes-green" onclick="setYN('entHygiene', true, this)">SÍ</button>
             <button type="button" class="yn-btn no active" onclick="setYN('entHygiene', false, this)">NO</button>
             <input type="hidden" id="entHygiene" value="false" />
           </div>
@@ -982,6 +984,7 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
+    // DESCARGA ESTRICTA: PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
@@ -1039,8 +1042,13 @@
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
           const db = e.target.result;
+          let store;
           if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          } else {
+            store = e.target.transaction.objectStore(STORE_NAME);
+          }
+          if (!store.indexNames.contains('syncStatus')) {
             store.createIndex('syncStatus', 'syncStatus', { unique: false });
           }
         };
@@ -1058,6 +1066,7 @@
           const req = store.put(data);
           req.onsuccess = () => resolve(data);
           req.onerror = (e) => reject(e.target.error);
+          tx.onabort = (e) => reject(e.target.error || new Error('No se pudo guardar en memoria local.'));
         });
       },
 
@@ -1069,6 +1078,7 @@
           const req = store.delete(id);
           req.onsuccess = () => resolve(true);
           req.onerror = (e) => reject(e.target.error);
+          tx.onabort = (e) => reject(e.target.error || new Error('No se pudo eliminar de memoria local.'));
         });
       },
 
@@ -1141,6 +1151,7 @@
       });
 
       setTimeout(() => { map.invalidateSize(); }, 300);
+      window.addEventListener('resize', () => map.invalidateSize());
       refreshMapAndBadges();
       fetchGlobalReports();
     }
@@ -1204,7 +1215,7 @@
         return;
       }
 
-      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       for (const [name, coord] of Object.entries(LOCAL_PANAMA_PLACES)) {
         if (name.includes(upperTerm) || upperTerm.includes(name)) {
           map.setView(coord, 15);
@@ -1231,8 +1242,9 @@
     };
 
     window.setFilter = (filter, ev) => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      ev.target.classList.add('active');
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${filter}'`));
+      });
 
       if (filter === 'ALL') {
         map.addLayer(layerPending);
@@ -1290,6 +1302,21 @@
       }
     };
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>\"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;'
+      })[char]);
+    }
+
+    function safePhotoUrl(value) {
+      try {
+        const url = new URL(String(value || ''), window.location.href);
+        return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
+      } catch (_) {
+        return '';
+      }
+    }
+
     async function refreshMapAndBadges() {
       if (!map) return;
       const allReports = await StorageService.getAllReports();
@@ -1318,16 +1345,16 @@
         marker.bindPopup(`
           <div class="popup-card">
             <span class="popup-badge ${isAttended ? 'popup-attended' : 'popup-pending'}">
-              ${isAttended ? 'ATENDIDO' : 'PENDIENTE'} - ${r.priority}
+              ${isAttended ? 'ATENDIDO' : 'PENDIENTE'} - ${escapeHtml(r.priority)}
             </span>
-            <p><b>Contacto:</b> ${r.contactName || 'No especificado'}</p>
-            <p><b>Tel:</b> ${r.contactPhone || 'N/A'}</p>
-            <p><b>Plus Code:</b> <code>${r.plusCode || 'N/A'}</code></p>
-            <p><b>Daño Casa:</b> ${r.houseDamage}</p>
-            <p><b>Afectados:</b> ${r.totalPeople} personas (${r.seniorsCount} adultos may., ${r.minorsCount} niños)</p>
-            ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
-            ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
-            ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
+            <p><b>Contacto:</b> ${escapeHtml(r.contactName || 'No especificado')}</p>
+            <p><b>Tel:</b> ${escapeHtml(r.contactPhone || 'N/A')}</p>
+            <p><b>Plus Code:</b> <code>${escapeHtml(r.plusCode || 'N/A')}</code></p>
+            <p><b>Daño Casa:</b> ${escapeHtml(r.houseDamage)}</p>
+            <p><b>Afectados:</b> ${escapeHtml(r.totalPeople)} personas (${escapeHtml(r.seniorsCount)} adultos may., ${escapeHtml(r.minorsCount)} niños)</p>
+            ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${escapeHtml(r.disabledCount)}</p>` : ''}
+            ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${escapeHtml(r.medicalCasesCount)} (${escapeHtml(r.medicalConditions || 'Sin detalle')})</p>` : ''}
+            ${safePhotoUrl(r.photoUrl) ? `<p><a href="${escapeHtml(safePhotoUrl(r.photoUrl))}" target="_blank" rel="noopener noreferrer" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
             
             <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
               📝 Cargar en Formulario
@@ -1383,9 +1410,12 @@
           }
 
           await refreshMapAndBadges();
+          return json.data;
         }
+        return null;
       } catch (err) {
         console.warn('No se pudieron descargar reportes remotos:', err);
+        return null;
       }
     }
 
@@ -1429,9 +1459,20 @@
           body: JSON.stringify({ batch: pending })
         });
 
-        await StorageService.markAsSynced(pending.map(p => p.id));
+        // no-cors no permite leer la respuesta del servidor. Solo marcamos como
+        // sincronizados los IDs que luego aparezcan confirmados en Google Sheets.
+        const remoteReports = await fetchGlobalReports();
+        if (!Array.isArray(remoteReports)) return false;
+        const remoteIds = new Set(remoteReports.map(item => String(item.id)));
+        const confirmedIds = pending
+          .filter(item => remoteIds.has(String(item.id)))
+          .map(item => item.id);
+
+        if (confirmedIds.length) {
+          await StorageService.markAsSynced(confirmedIds);
+        }
         await refreshMapAndBadges();
-        return true;
+        return confirmedIds.length === pending.length;
       } catch (err) {
         console.warn('Fallo en sincronización local:', err);
         return false;
@@ -1701,6 +1742,9 @@
       document.getElementById('attendedAt').value = '';
       document.getElementById('photoBase64').value = '';
       document.getElementById('photoUrl').value = '';
+      document.getElementById('cameraInput').value = '';
+      document.getElementById('galleryInput').value = '';
+      document.getElementById('photoPreviewImg').removeAttribute('src');
       document.getElementById('photoPreviewImg').style.display = 'none';
       document.getElementById('photoStatusText').textContent = '';
 
@@ -1733,7 +1777,19 @@
       handleStatusChange();
     }
 
+    let isSavingRecord = false;
     window.saveRecord = async () => {
+      if (isSavingRecord) return;
+      const saveButton = document.querySelector('.btn-submit');
+      const latitude = Number(document.getElementById('lat').value);
+      const longitude = Number(document.getElementById('lng').value);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        alert('Selecciona una ubicación válida en el mapa o usa “Mi Ubicación” antes de guardar.');
+        return;
+      }
+      isSavingRecord = true;
+      if (saveButton) { saveButton.disabled = true; saveButton.textContent = '⏳ Guardando...'; }
+      try {
       const existingId = document.getElementById('reportId').value;
       const id = existingId !== '' ? existingId : crypto.randomUUID();
 
@@ -1811,7 +1867,16 @@
       await StorageService.saveReport(reportData);
       resetFormToDefaults();
       await refreshMapAndBadges();
-      triggerSync();
+      if (navigator.onLine) {
+        triggerSync();
+      }
+      } catch (err) {
+        console.error('Error guardando reporte:', err);
+        alert('No se pudo guardar el reporte en este dispositivo. Verifica el almacenamiento disponible e intenta nuevamente.');
+      } finally {
+        isSavingRecord = false;
+        if (saveButton) { saveButton.disabled = false; saveButton.textContent = '💾 Guardar Reporte'; }
+      }
     };
 
     window.addEventListener('DOMContentLoaded', () => {
