@@ -1,171 +1,118 @@
+/* Service Worker - Brigada Rotary
+ * Cachea la estructura de la aplicación y recursos estáticos.
+ * No almacena respuestas privadas de Google Apps Script ni descarga teselas masivamente.
+ */
+'use strict';
 
-const CACHE_PREFIX = 'brigada-rotary-';
-const APP_SHELL_CACHE = `${CACHE_PREFIX}app-v13`;
-const TILES_CACHE = `${CACHE_PREFIX}tiles-v2`;
+const APP_CACHE = 'brigada-rotary-app-v14';
+const RUNTIME_CACHE = 'brigada-rotary-runtime-v1';
+const APP_SHELL = ['./', './index.html', './manifest.json', './icons/brigada-rotary.svg'];
 
-const APP_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-
-const OPTIONAL_ASSETS = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-];
-
-const MAX_TILE_CACHE = 1500;
-
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    const cache = await caches.open(APP_SHELL_CACHE);
-
-    // Los archivos esenciales deben estar disponibles.
-    await cache.addAll(APP_ASSETS);
-
-    // Leaflet se intenta guardar sin cancelar toda la instalación
-    // si el CDN no está disponible.
-    await Promise.allSettled(
-      OPTIONAL_ASSETS.map(async (asset) => {
-        const response = await fetch(asset);
-
-        if (response.ok) {
-          await cache.put(asset, response);
-        }
-      })
-    );
-
+    const cache = await caches.open(APP_CACHE);
+    await cache.addAll(APP_SHELL);
     await self.skipWaiting();
   })());
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-
-    await Promise.all(
-      keys
-        .filter((key) =>
-          key.startsWith(CACHE_PREFIX) &&
-          key !== APP_SHELL_CACHE &&
-          key !== TILES_CACHE
-        )
-        .map((key) => caches.delete(key))
-    );
-
+    await Promise.all(keys
+      .filter(key => key.startsWith('brigada-rotary-') && ![APP_CACHE, RUNTIME_CACHE].includes(key))
+      .map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
 
-async function saveTile(cache, request, response) {
-  if (!response || !(response.ok || response.type === 'opaque')) {
-    return;
-  }
-
-  await cache.put(request, response.clone());
-
-  // Evita que la caché de mosaicos crezca indefinidamente.
-  const keys = await cache.keys();
-
-  if (keys.length > MAX_TILE_CACHE) {
-    const excess = keys.length - MAX_TILE_CACHE;
-
-    await Promise.all(
-      keys.slice(0, excess).map((key) => cache.delete(key))
-    );
-  }
+function isGoogleService(url) {
+  return /(^|\.)google(script|usercontent)?\.com$/i.test(url.hostname) ||
+    /(^|\.)googleapis\.com$/i.test(url.hostname) ||
+    /script\.google\.com$/i.test(url.hostname);
 }
 
-async function handleTileRequest(request) {
-  const cache = await caches.open(TILES_CACHE);
-  const cached = await cache.match(request);
-
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    const response = await fetch(request);
-
-    if (response.ok || response.type === 'opaque') {
-      await saveTile(cache, request, response);
-    }
-
-    return response;
-  } catch {
-    return new Response('', {
-      status: 503,
-      statusText: 'Mapa no disponible sin conexión'
-    });
-  }
+function isMapTile(url) {
+  return url.hostname === 'tile.openstreetmap.org' ||
+    url.hostname.endsWith('.tile.openstreetmap.org') ||
+    url.hostname === 'server.arcgisonline.com';
 }
 
-async function handleAppRequest(request) {
-  const cached = await caches.match(request);
-
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    const response = await fetch(request);
-
-    if (response.ok && response.type === 'basic') {
-      const cache = await caches.open(APP_SHELL_CACHE);
-
-      // Solo almacenar recursos del mismo origen.
-      await cache.put(request, response.clone());
-    }
-
-    return response;
-  } catch {
-    if (request.mode === 'navigate') {
-      const fallback = await caches.match('./index.html');
-
-      if (fallback) {
-        return fallback;
-      }
-    }
-
-    return new Response('Recurso no disponible sin conexión.', {
-      status: 503,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-    });
-  }
-}
-
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   const request = event.request;
+  if (request.method !== 'GET') return;
 
-  if (request.method !== 'GET') {
+  let url;
+  try { url = new URL(request.url); } catch (_) { return; }
+
+  // No interceptar la API de Google: evita guardar datos de emergencia en caché por accidente.
+  if (isGoogleService(url)) return;
+
+  // Las teselas se solicitan directamente al proveedor y no se guardan para uso offline.
+  // OpenStreetMap público no autoriza la descarga masiva de áreas para mapas offline.
+  if (isMapTile(url)) return;
+
+  // Recursos de Leaflet: caché de ejecución para que el mapa pueda inicializar si ya se cargaron antes.
+  if (url.hostname === 'unpkg.com') {
+    event.respondWith((async () => {
+      const cache = await caches.open(RUNTIME_CACHE);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response.ok && (request.destination === 'script' || request.destination === 'style')) {
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        return new Response('Recurso no disponible sin conexión.', {
+          status: 503,
+          statusText: 'Offline',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      }
+    })());
     return;
   }
 
-  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
-  // No interceptar envíos ni servicios externos.
-  if (
-    url.hostname === 'script.google.com' ||
-    url.hostname.endsWith('.googleusercontent.com') ||
-    url.hostname === 'googleusercontent.com'
-  ) {
+  // Navegación: primero red para recibir actualizaciones; si falla, usa la app guardada.
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(APP_CACHE);
+          await cache.put('./index.html', response.clone());
+        }
+        return response;
+      } catch (_) {
+        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+      }
+    })());
     return;
   }
 
-  const isOsmTile =
-    url.hostname === 'tile.openstreetmap.org';
-
-  const isArcgisTile =
-    url.hostname === 'server.arcgisonline.com' ||
-    url.hostname.endsWith('.arcgisonline.com');
-
-  if (isOsmTile || isArcgisTile) {
-    event.respondWith(handleTileRequest(request));
-    return;
-  }
-
-  // Interceptar la aplicación y los recursos del mismo origen.
-  if (url.origin === self.location.origin) {
-    event.respondWith(handleAppRequest(request));
+  // Archivos estáticos propios: cache-first, con actualización en segundo plano si la red está disponible.
+  if (['style', 'script', 'image', 'font', 'manifest'].includes(request.destination) ||
+      /\/(manifest\.json|index\.html)$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(APP_CACHE);
+      const cached = await cache.match(request);
+      if (cached) {
+        fetch(request).then(response => {
+          if (response.ok) cache.put(request, response.clone()).catch(() => {});
+        }).catch(() => {});
+        return cached;
+      }
+      try {
+        const response = await fetch(request);
+        if (response.ok) await cache.put(request, response.clone());
+        return response;
+      } catch (_) {
+        return Response.error();
+      }
+    })());
   }
 });

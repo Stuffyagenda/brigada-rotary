@@ -522,8 +522,8 @@
       <input type="hidden" id="reportId" />
       <input type="hidden" id="createdAt" />
       <input type="hidden" id="attendedAt" />
-      <input type="hidden" id="lat" value="7.965" />
-      <input type="hidden" id="lng" value="-80.432" />
+      <input type="hidden" id="lat" value="" />
+      <input type="hidden" id="lng" value="" />
       <input type="hidden" id="plusCode" value="764R6FW7+C8" />
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
@@ -532,7 +532,7 @@
       <div class="section-title title-blue">Ubicación y Evaluación</div>
       <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
-        <span id="plusCodeDisplay" class="pluscode-badge">764R6FW7+C8</span>
+        <span id="plusCodeDisplay" class="pluscode-badge">Selecciona ubicación</span>
       </div>
 
       <div class="row-2">
@@ -855,7 +855,7 @@
           <span id="syncBadge" class="badge badge-stats">0 pendientes</span>
           <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
           <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
+          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">🗺️ Mapa sin conexión</span>
         </div>
 
         <div class="search-layer-bar">
@@ -889,7 +889,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(() => console.log('SW offline listo'))
+          .then(() => console.log('Service Worker registrado'))
           .catch((err) => console.warn('Aviso SW:', err));
       });
     }
@@ -984,53 +984,15 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
-    // DESCARGA ESTRICTA: PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
+    // OpenStreetMap público no permite descargas masivas para uso sin conexión.
+    // Los reportes sí funcionan offline; para mapas offline se necesita un proveedor con licencia compatible.
     window.downloadCentralProvincesMap = async () => {
-      const btn = document.getElementById('btnDownloadRegion');
-      if (!navigator.onLine) {
-        alert('Se requiere conexión a internet para descargar el mapa de Provincias Centrales.');
-        return;
-      }
-
-      btn.textContent = '⏳ Descargando...';
-      const minLat = 7.2, minLon = -81.8, maxLat = 8.9, maxLon = -80.0;
-      const tileUrls = [];
-
-      for (let z = 9; z <= 12; z++) {
-        const xMin = lon2tile(minLon, z);
-        const xMax = lon2tile(maxLon, z);
-        const yMin = lat2tile(maxLat, z);
-        const yMax = lat2tile(minLat, z);
-
-        for (let x = xMin; x <= xMax; x++) {
-          for (let y = yMin; y <= yMax; y++) {
-            tileUrls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
-          }
-        }
-      }
-
-      try {
-        const cache = await caches.open('osm-tiles-offline-v1');
-        let done = 0;
-        for (const url of tileUrls) {
-          try {
-            const hasMatch = await cache.match(url);
-            if (!hasMatch) {
-              const res = await fetch(url, { mode: 'cors' });
-              if (res.ok) await cache.put(url, res);
-            }
-          } catch (e) {}
-          done++;
-          if (done % 50 === 0) {
-            btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}%`;
-          }
-        }
-        btn.textContent = '✅ Mapa Guardado';
-        alert('¡Mapa de Provincias Centrales guardado con éxito!');
-      } catch (err) {
-        btn.textContent = '❌ Error descarga';
-        alert('Error descargando mapa: ' + err.message);
-      }
+      alert(
+        'Los reportes y el formulario funcionan sin conexión.\n\n' +
+        'La descarga masiva de teselas del servidor público de OpenStreetMap está deshabilitada ' +
+        'para respetar sus condiciones de uso. Para mapas sin conexión, configura un proveedor ' +
+        'que autorice expresamente la descarga y el almacenamiento offline.'
+      );
     };
 
     const DB_NAME = 'BrigadasEmergencyDB';
@@ -1134,12 +1096,12 @@
     let currentMarker = null;
 
     function initMap() {
-      streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-      satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+      streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>' });
+      satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' });
 
       map = L.map('map', {
         zoomControl: false,
-        attributionControl: false,
+        attributionControl: true,
         layers: [streetLayer]
       }).setView([7.965, -80.432], 11);
 
@@ -1258,47 +1220,36 @@
       }
     };
 
-    // ELIMINACIÓN CON PIN DE SEGURIDAD
+    // La eliminación requiere conexión y confirmación explícita del servidor.
     window.deleteLocationWithPin = async (id) => {
       const pin = prompt('🔒 Ingresa el PIN de Administrador para eliminar este punto:');
       if (pin === null || pin.trim() === '') return;
+      if (!navigator.onLine) {
+        alert('No hay conexión. El registro no se eliminó; conéctate a internet e inténtalo de nuevo.');
+        return;
+      }
+      if (!confirm('¿Seguro que deseas eliminar este reporte de Google Sheets y de los dispositivos sincronizados?')) return;
 
       try {
-        if (navigator.onLine) {
-          const formData = new URLSearchParams();
-          formData.append('data', JSON.stringify({ action: 'delete', id: id, pin: pin.trim() }));
-
-          const res = await fetch(WEBHOOK_URL, {
-            method: 'POST',
-            body: formData
-          });
-
-          const json = await res.json();
-          if (json && json.status === 'unauthorized') {
-            alert('❌ PIN Incorrecto. No tienes autorización para eliminar registros.');
-            return;
-          }
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'delete', id: String(id), pin: pin.trim() })
+        });
+        const remoteReports = await fetchGlobalReports();
+        if (!Array.isArray(remoteReports)) throw new Error('No se pudo verificar la respuesta del servidor.');
+        if (remoteReports.some(item => String(item.id) === String(id))) {
+          throw new Error('El servidor no confirmó la eliminación. Verifica el PIN y vuelve a intentarlo.');
         }
 
         await StorageService.deleteReport(id);
         await refreshMapAndBadges();
         resetFormToDefaults();
-        alert('✅ Registro eliminado correctamente.');
+        alert('Registro eliminado y confirmado por el servidor.');
       } catch (err) {
-        try {
-          await fetch(WEBHOOK_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'delete', id: id, pin: pin.trim() })
-          });
-          await StorageService.deleteReport(id);
-          await refreshMapAndBadges();
-          resetFormToDefaults();
-          alert('✅ Registro eliminado correctamente.');
-        } catch (e) {
-          alert('Error al intentar eliminar: ' + e.message);
-        }
+        console.error('Error al eliminar reporte:', err);
+        alert('No se pudo confirmar la eliminación. El registro se conservó en este dispositivo. ' + err.message);
       }
     };
 
@@ -1331,10 +1282,13 @@
       layerAttended.clearLayers();
 
       allReports.forEach(r => {
+        const lat = Number(r.lat);
+        const lng = Number(r.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
         const isAttended = r.status === 'ATENDIDO';
         const markerColor = isAttended ? '#16a34a' : '#dc2626';
 
-        const marker = L.circleMarker([r.lat, r.lng], {
+        const marker = L.circleMarker([lat, lng], {
           radius: 10,
           fillColor: markerColor,
           color: '#ffffff',
@@ -1356,10 +1310,10 @@
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${escapeHtml(r.medicalCasesCount)} (${escapeHtml(r.medicalConditions || 'Sin detalle')})</p>` : ''}
             ${safePhotoUrl(r.photoUrl) ? `<p><a href="${escapeHtml(safePhotoUrl(r.photoUrl))}" target="_blank" rel="noopener noreferrer" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
             
-            <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
+            <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm(${escapeHtml(JSON.stringify(String(r.id)))})">
               📝 Cargar en Formulario
             </button>
-            <button style="margin-top:6px; width:100%; padding:7px; background:#dc2626; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.deleteLocationWithPin('${r.id}')">
+            <button style="margin-top:6px; width:100%; padding:7px; background:#dc2626; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.deleteLocationWithPin(${escapeHtml(JSON.stringify(String(r.id)))})">
               🗑️ Eliminar Ubicación
             </button>
           </div>
@@ -1375,44 +1329,43 @@
 
     // DESCARGA DE REPORTES GLOBALES: Refleja fielmente la hoja de Google Sheets
     async function fetchGlobalReports() {
-      if (!navigator.onLine) return;
+      if (!navigator.onLine) return null;
       try {
         const res = await fetch(WEBHOOK_URL + '?action=get_all', {
           method: 'GET',
-          redirect: 'follow'
+          redirect: 'follow',
+          cache: 'no-store'
         });
+        if (!res.ok) throw new Error('El servidor respondió HTTP ' + res.status);
         const json = await res.json();
-        
-        if (json && json.status === 'success' && Array.isArray(json.data)) {
-          const db = await openDatabase();
-          
-          const currentReports = await StorageService.getAllReports();
-          const localPending = currentReports.filter(r => r.syncStatus === 'PENDING');
-          
-          // Limpia la memoria local para que coincida exactamente con Sheets
-          const tx = db.transaction([STORE_NAME], 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          store.clear();
-          
-          await new Promise((resolve) => {
-            tx.oncomplete = () => resolve();
-          });
-
-          // Restaura los pendientes locales creados sin conexión
-          for (const pending of localPending) {
-            await StorageService.saveReport(pending);
-          }
-
-          // Carga los datos confirmados desde Google Sheets
-          for (const item of json.data) {
-            item.syncStatus = 'SYNCED';
-            await StorageService.saveReport(item);
-          }
-
-          await refreshMapAndBadges();
-          return json.data;
+        if (!json || json.status !== 'success' || !Array.isArray(json.data)) {
+          throw new Error((json && json.message) || 'Respuesta inválida del servidor.');
         }
-        return null;
+
+        const currentReports = await StorageService.getAllReports();
+        const localById = new Map(currentReports.map(item => [String(item.id), item]));
+        const remoteIds = new Set(json.data.map(item => String(item.id)));
+
+        // Los cambios locales pendientes siempre tienen prioridad sobre una copia remota antigua.
+        for (const remoteItem of json.data) {
+          const id = String(remoteItem.id);
+          const localItem = localById.get(id);
+          if (localItem && localItem.syncStatus === 'PENDING') continue;
+          remoteItem.syncStatus = 'SYNCED';
+          await StorageService.saveReport(remoteItem);
+        }
+
+        // Quita del dispositivo los registros sincronizados que ya no existen en Sheets,
+        // pero nunca borra reportes pendientes ni datos que todavía no se han subido.
+        for (const localItem of currentReports) {
+          const id = String(localItem.id);
+          if (localItem.syncStatus !== 'PENDING' && !remoteIds.has(id)) {
+            await StorageService.deleteReport(localItem.id);
+          }
+        }
+
+        await refreshMapAndBadges();
+        return json.data;
       } catch (err) {
         console.warn('No se pudieron descargar reportes remotos:', err);
         return null;
@@ -1444,33 +1397,55 @@
     let isSyncing = false;
     async function triggerSync() {
       if (!navigator.onLine || isSyncing) return false;
-      const pending = await StorageService.getPendingReports();
-      if (pending.length === 0) {
-        await fetchGlobalReports();
-        return true;
-      }
-
       isSyncing = true;
       try {
-        await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ batch: pending })
-        });
+        const pending = await StorageService.getPendingReports();
+        if (pending.length === 0) {
+          const remote = await fetchGlobalReports();
+          return Array.isArray(remote);
+        }
 
-        // no-cors no permite leer la respuesta del servidor. Solo marcamos como
-        // sincronizados los IDs que luego aparezcan confirmados en Google Sheets.
+        // Enviar un reporte por petición limita el tamaño de cada carga y aísla fallos de fotos.
+        // no-cors no permite leer la respuesta; la confirmación se hace después contra el GET remoto.
+        for (const item of pending) {
+          try {
+            await fetch(WEBHOOK_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify(item)
+            });
+          } catch (sendError) {
+            console.warn('No se pudo enviar el reporte ' + item.id + ':', sendError);
+          }
+        }
+
         const remoteReports = await fetchGlobalReports();
         if (!Array.isArray(remoteReports)) return false;
-        const remoteIds = new Set(remoteReports.map(item => String(item.id)));
-        const confirmedIds = pending
-          .filter(item => remoteIds.has(String(item.id)))
-          .map(item => item.id);
+        const remoteById = new Map(remoteReports.map(item => [String(item.id), item]));
+        const confirmedIds = [];
 
-        if (confirmedIds.length) {
-          await StorageService.markAsSynced(confirmedIds);
+        for (const localItem of pending) {
+          const remoteItem = remoteById.get(String(localItem.id));
+          if (!remoteItem) continue;
+
+          // La mera existencia del ID no confirma una actualización: compara la versión temporal.
+          const localTime = Date.parse(localItem.updatedAt || localItem.createdAt || '');
+          const remoteTime = Date.parse(remoteItem.updatedAt || remoteItem.createdAt || '');
+          if (!Number.isFinite(localTime) || !Number.isFinite(remoteTime) || Math.abs(remoteTime - localTime) > 2000) {
+            continue;
+          }
+
+          // Si hay foto pendiente, exige una URL nueva/distinta antes de borrar el Base64 local.
+          if (localItem.photoBase64) {
+            const previousUrl = String(localItem.photoUrl || '');
+            const remoteUrl = String(remoteItem.photoUrl || '');
+            if (!remoteUrl || remoteUrl === previousUrl) continue;
+          }
+          confirmedIds.push(localItem.id);
         }
+
+        if (confirmedIds.length) await StorageService.markAsSynced(confirmedIds);
         await refreshMapAndBadges();
         return confirmedIds.length === pending.length;
       } catch (err) {
@@ -1482,41 +1457,48 @@
     }
 
     window.handlePhotoUpload = (e) => {
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
-
       const photoStatus = document.getElementById('photoStatusText');
+      const maxFileBytes = 15 * 1024 * 1024;
+      if (!file.type.startsWith('image/')) {
+        photoStatus.textContent = 'El archivo seleccionado no es una imagen.';
+        e.target.value = '';
+        return;
+      }
+      if (file.size > maxFileBytes) {
+        photoStatus.textContent = 'La imagen original supera 15 MB. Selecciona otra más pequeña.';
+        e.target.value = '';
+        return;
+      }
       photoStatus.textContent = 'Optimizando foto...';
-
       const reader = new FileReader();
+      reader.onerror = () => { photoStatus.textContent = 'No se pudo leer la imagen.'; };
       reader.onload = (readerEvent) => {
         const img = new Image();
+        img.onerror = () => { photoStatus.textContent = 'No se pudo procesar la imagen.'; };
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+          try {
+            const maxDim = 1200;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const width = Math.max(1, Math.round(img.width * scale));
+            const height = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No se pudo crear el procesador de imagen.');
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.72);
+            document.getElementById('photoBase64').value = compressedBase64;
+            const previewImg = document.getElementById('photoPreviewImg');
+            previewImg.src = compressedBase64;
+            previewImg.style.display = 'block';
+            photoStatus.textContent = 'Foto optimizada y lista para guardar (' + Math.round(compressedBase64.length / 1024) + ' KB aprox.)';
+          } catch (err) {
+            console.error('Error optimizando foto:', err);
+            photoStatus.textContent = 'No se pudo optimizar la imagen.';
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
-
-          document.getElementById('photoBase64').value = compressedBase64;
-          const previewImg = document.getElementById('photoPreviewImg');
-          previewImg.src = compressedBase64;
-          previewImg.style.display = 'block';
-          photoStatus.textContent = 'Foto lista para guardar';
         };
         img.src = readerEvent.target.result;
       };
@@ -1664,7 +1646,7 @@
       document.getElementById('plusCode').value = report.plusCode;
       document.getElementById('plusCodeDisplay').textContent = report.plusCode;
 
-      document.getElementById('photoBase64').value = '';
+      document.getElementById('photoBase64').value = report.photoBase64 || '';
       document.getElementById('photoUrl').value = report.photoUrl || '';
       const previewImg = document.getElementById('photoPreviewImg');
       const photoStatus = document.getElementById('photoStatusText');
@@ -1740,6 +1722,14 @@
       document.getElementById('reportId').value = '';
       document.getElementById('createdAt').value = '';
       document.getElementById('attendedAt').value = '';
+      document.getElementById('lat').value = '';
+      document.getElementById('lng').value = '';
+      document.getElementById('plusCode').value = '';
+      document.getElementById('plusCodeDisplay').textContent = 'Selecciona ubicación';
+      if (currentMarker && map) {
+        map.removeLayer(currentMarker);
+        currentMarker = null;
+      }
       document.getElementById('photoBase64').value = '';
       document.getElementById('photoUrl').value = '';
       document.getElementById('cameraInput').value = '';
@@ -1781,9 +1771,11 @@
     window.saveRecord = async () => {
       if (isSavingRecord) return;
       const saveButton = document.querySelector('.btn-submit');
-      const latitude = Number(document.getElementById('lat').value);
-      const longitude = Number(document.getElementById('lng').value);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+      const latitudeRaw = document.getElementById('lat').value.trim();
+      const longitudeRaw = document.getElementById('lng').value.trim();
+      const latitude = Number(latitudeRaw);
+      const longitude = Number(longitudeRaw);
+      if (latitudeRaw === '' || longitudeRaw === '' || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
         alert('Selecciona una ubicación válida en el mapa o usa “Mi Ubicación” antes de guardar.');
         return;
       }
@@ -1791,7 +1783,7 @@
       if (saveButton) { saveButton.disabled = true; saveButton.textContent = '⏳ Guardando...'; }
       try {
       const existingId = document.getElementById('reportId').value;
-      const id = existingId !== '' ? existingId : crypto.randomUUID();
+      const id = existingId !== '' ? existingId : (window.crypto && crypto.randomUUID ? crypto.randomUUID() : ('RPT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)));
 
       const brigadista = document.getElementById('brigadistaInput').value.trim();
       if (brigadista) localStorage.setItem('lastBrigadista', brigadista);
