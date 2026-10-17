@@ -1313,7 +1313,7 @@
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
             <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
-              📝 Cargar en Formulario
+              📝 Editar el Formulario
             </button>
           </div>
         `);
@@ -1347,31 +1347,39 @@
     // SUBIDA AUTOMÁTICA EN SEGUNDO PLANO
     let isSyncing = false;
     async function triggerSync() {
-      if (!navigator.onLine || isSyncing) return;
-      const pending = await StorageService.getPendingReports();
-      if (pending.length === 0) {
-        await fetchGlobalReports();
-        return;
-      }
+  if (!navigator.onLine || isSyncing) return;
+  const pending = await StorageService.getPendingReports();
+  if (pending.length === 0) {
+    await fetchGlobalReports();
+    return;
+  }
 
-      isSyncing = true;
-      try {
-        await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batch: pending })
-        });
+  isSyncing = true;
+  try {
+    // Usamos x-www-form-urlencoded para evitar bloqueos CORS en Apps Script
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ batch: pending })
+    });
 
-        await StorageService.markAsSynced(pending.map(p => p.id));
-        await refreshMapAndBadges();
-        await fetchGlobalReports();
-      } catch (err) {
-        console.warn('Fallo sync, se mantendrán en cola local:', err);
-      } finally {
-        isSyncing = false;
-      }
+    const result = await response.json();
+
+    if (result && result.status === 'success') {
+      await StorageService.markAsSynced(pending.map(p => p.id));
+      await refreshMapAndBadges();
+      await fetchGlobalReports();
+      alert('✅ Sincronizado con éxito con Google Sheets.');
+    } else {
+      alert('⚠️ Error reportado por Google: ' + JSON.stringify(result));
     }
+  } catch (err) {
+    console.warn('Fallo de conexión:', err);
+    // Mantiene los registros en IndexedDB para intentar de nuevo
+  } finally {
+    isSyncing = false;
+  }
+}
 
     // =========================================================================
     // PROCESAMIENTO Y COMPRESIÓN DE FOTO
