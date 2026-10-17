@@ -4,7 +4,7 @@
  */
 'use strict';
 
-const APP_CACHE = 'brigada-rotary-app-v15';
+const APP_CACHE = 'brigada-rotary-app-v16';
 const RUNTIME_CACHE = 'brigada-rotary-runtime-v1';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icons/brigada-rotary.svg'];
 

@@ -1061,63 +1061,84 @@
       "EL VALLE": [8.6000, -80.1333], "NATA": [8.3333, -80.5167], "OLA": [8.4167, -80.6500], "RIO HATO": [8.3833, -80.1667]
     };
 
+    // Implementación compatible con el formato oficial Open Location Code (Plus Codes).
     const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
+    const OLC_PAIR_RESOLUTIONS = [20, 1, 0.05, 0.0025, 0.000125];
 
     function encodePlusCode(latitude, longitude) {
-      try {
-        let lat = Math.min(Math.max(latitude, -90), 90) + 90;
-        let lng = longitude;
-        while (lng < -180) lng += 360;
-        while (lng >= 180) lng -= 360;
-        lng += 180;
-
-        let code = "";
-        let latVal = lat;
-        let lngVal = lng;
-        let latGrid = 20.0;
-        let lngGrid = 20.0;
-
-        for (let i = 0; i < 4; i++) {
-          let latDigit = Math.floor(latVal / latGrid);
-          let lngDigit = Math.floor(lngVal / lngGrid);
-          latVal -= latDigit * latGrid;
-          lngVal -= lngDigit * lngGrid;
-          code += OLC_ALPHABET.charAt(latDigit) + OLC_ALPHABET.charAt(lngDigit);
-          latGrid /= 20.0;
-          lngGrid /= 20.0;
-        }
-        code = code.substring(0, 8) + "+" + code.substring(8);
-        let latDigit = Math.floor(latVal / latGrid);
-        let lngDigit = Math.floor(lngVal / lngGrid);
-        code += OLC_ALPHABET.charAt(latDigit) + OLC_ALPHABET.charAt(lngDigit);
-        return code;
-      } catch (e) {
-        return "N/A";
+      if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return "N/A";
+      let lat = Math.max(-90, Math.min(90, Number(latitude)));
+      if (lat === 90) lat -= 0.0000000001;
+      let lng = ((Number(longitude) + 180) % 360 + 360) % 360;
+      lat += 90;
+      let code = "";
+      for (const resolution of OLC_PAIR_RESOLUTIONS) {
+        const latDigit = Math.max(0, Math.min(19, Math.floor(lat / resolution)));
+        const lngDigit = Math.max(0, Math.min(19, Math.floor(lng / resolution)));
+        code += OLC_ALPHABET[latDigit] + OLC_ALPHABET[lngDigit];
+        lat -= latDigit * resolution;
+        lng -= lngDigit * resolution;
       }
+      return code.slice(0, 8) + "+" + code.slice(8, 10);
     }
 
-    function decodePlusCode(code) {
-      let clean = code.replace("+", "").trim().toUpperCase();
-      if (clean.length < 8) return null;
-
-      let latVal = -90.0;
-      let lngVal = -180.0;
-      let latGrid = 20.0;
-      let lngGrid = 20.0;
-
-      for (let i = 0; i < Math.min(clean.length, 10); i += 2) {
-        let d1 = OLC_ALPHABET.indexOf(clean[i]);
-        let d2 = OLC_ALPHABET.indexOf(clean[i + 1]);
-        if (d1 === -1 || d2 === -1) return null;
-        latVal += d1 * latGrid;
-        lngVal += d2 * lngGrid;
-        latGrid /= 20.0;
-        lngGrid /= 20.0;
+    function decodeFullPlusCode(rawCode) {
+      let code = String(rawCode || "").toUpperCase().replace(/\s+/g, "");
+      if (!code.includes("+") && /^[23456789CFGHJMPQRVWX]{10,11}$/.test(code)) {
+        code = code.slice(0, 8) + "+" + code.slice(8);
       }
+      if (!code.includes("+") || code.indexOf("+") !== 8 || code.lastIndexOf("+") !== 8) return null;
+      const digits = code.replace("+", "");
+      if (digits.length < 8 || digits.length > 11 || !/^[23456789CFGHJMPQRVWX]+$/.test(digits)) return null;
+      let lat = -90;
+      let lng = -180;
+      let latRes = 20;
+      let lngRes = 20;
+      const pairDigits = Math.min(10, digits.length);
+      for (let i = 0; i < pairDigits; i += 2) {
+        const resolution = OLC_PAIR_RESOLUTIONS[i / 2];
+        const latDigit = OLC_ALPHABET.indexOf(digits[i]);
+        const lngDigit = OLC_ALPHABET.indexOf(digits[i + 1]);
+        if (latDigit < 0 || lngDigit < 0) return null;
+        lat += latDigit * resolution;
+        lng += lngDigit * resolution;
+        latRes = lngRes = resolution;
+      }
+      // Refine codes of 11 characters using the official 5-row x 4-column grid.
+      if (digits.length > 10) {
+        const v = OLC_ALPHABET.indexOf(digits[10]);
+        if (v < 0) return null;
+        latRes = 0.000125 / 5;
+        lngRes = 0.000125 / 4;
+        lat += Math.floor(v / 4) * latRes;
+        lng += (v % 4) * lngRes;
+      }
+      return { lat: lat + latRes / 2, lng: lng + lngRes / 2, latRes, lngRes };
+    }
 
-      let latCenter = latVal + (latGrid * 20.0 / 2.0);
-      let lngCenter = lngVal + (lngGrid * 20.0 / 2.0);
-      return { lat: latCenter, lng: lngCenter };
+    function decodePlusCode(rawCode) {
+      let code = String(rawCode || "").toUpperCase().replace(/\s+/g, "");
+      // Un Plus Code corto requiere una referencia geográfica; en esta app usamos el centro de Panamá.
+      if (code.includes("+") && code.indexOf("+") < 8) {
+        if (!/^[23456789CFGHJMPQRVWX]{2,7}\+[23456789CFGHJMPQRVWX]{2,3}$/.test(code)) return null;
+        const reference = [7.965, -80.432];
+        const referenceCode = encodePlusCode(reference[0], reference[1]);
+        const prefixLength = 8 - code.indexOf("+");
+        code = referenceCode.slice(0, prefixLength) + code;
+        // Ajusta el candidato a la celda más cercana a la referencia.
+        const area = decodeFullPlusCode(code);
+        if (!area) return null;
+        const resolution = Math.pow(20, 2 - prefixLength / 2);
+        let lat = area.lat;
+        let lng = area.lng;
+        if (reference[0] + resolution / 2 < lat) lat -= resolution;
+        else if (reference[0] - resolution / 2 > lat) lat += resolution;
+        if (reference[1] + resolution / 2 < lng) lng -= resolution;
+        else if (reference[1] - resolution / 2 > lng) lng += resolution;
+        return { lat, lng };
+      }
+      const area = decodeFullPlusCode(code);
+      return area ? { lat: area.lat, lng: area.lng } : null;
     }
 
     window.toggleFormVisibility = () => {
