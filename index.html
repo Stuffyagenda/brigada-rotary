@@ -32,7 +32,6 @@
       position: relative;
     }
 
-    /* Panel Izquierdo */
     .sidebar-panel {
       width: 490px;
       min-width: 380px;
@@ -55,7 +54,6 @@
       bottom: 0;
     }
 
-    /* Panel Derecho */
     .map-panel {
       flex: 1;
       height: 100%;
@@ -88,7 +86,6 @@
       }
     }
 
-    /* Cabecera Limpia (Tipográfica sin imágenes propensas a deformación) */
     .rotary-header {
       display: flex;
       align-items: center;
@@ -121,7 +118,6 @@
       color: #e0004d;
     }
 
-    /* Botón flotante para Ocultar/Ver Formulario */
     .btn-toggle-form {
       position: absolute;
       top: 12px;
@@ -141,7 +137,6 @@
       gap: 6px;
     }
 
-    /* Barra Superior del Mapa */
     .map-top-bar {
       position: absolute;
       top: 10px;
@@ -181,7 +176,7 @@
     }
     .badge-online { background-color: #16a34a; }
     .badge-offline { background-color: #dc2626; }
-    .badge-sync { background-color: #0284c7; }
+    .badge-sync { background-color: #0284c7; cursor: pointer; }
     .badge-stats { background-color: #334155; }
     .badge-download {
       background-color: #7c3aed;
@@ -189,7 +184,6 @@
       pointer-events: auto;
     }
 
-    /* Barra de Búsqueda Mixta */
     .search-layer-bar {
       display: flex;
       gap: 6px;
@@ -284,7 +278,6 @@
       color: white;
     }
 
-    /* Secciones del Formulario */
     .section-title {
       font-size: 12px;
       font-weight: 800;
@@ -517,7 +510,6 @@
     <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
     <div id="sidebarPanel" class="sidebar-panel">
       
-      <!-- Cabecera Limpia sin imagen para evitar deformaciones -->
       <div class="rotary-header">
         <div class="rotary-icon-badge">⚙️</div>
         <div>
@@ -860,15 +852,16 @@
       <div class="map-top-bar">
         <div class="badge-group">
           <span id="connBadge" class="badge badge-online">En línea</span>
-          <span id="syncBadge" class="badge badge-sync">0 pendientes</span>
+          <span id="syncBtn" class="badge badge-sync" onclick="syncAllDevices()" title="Presiona para subir tus puntos y descargar los de todos">🔄 Sincronizar Todo</span>
+          <span id="syncBadge" class="badge badge-stats">0 pendientes</span>
           <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
           <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Provincias Centrales</span>
+          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
         </div>
 
-        <!-- Buscador Inteligente: Plus Code o Nombres de Comunidades de Panamá -->
+        <!-- Buscador Inteligente -->
         <div class="search-layer-bar">
-          <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas, Penonomé...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
+          <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
           <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
           <div class="layer-selector">
             <button type="button" id="btnLayerStreet" class="layer-btn active" onclick="switchLayer('street')">Calles</button>
@@ -898,17 +891,16 @@
     // =========================================================================
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
-    // REGISTRO DEL SERVICE WORKER OFFLINE
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(() => console.log('SW activo para modo offline'))
+          .then(() => console.log('SW offline listo'))
           .catch((err) => console.warn('Aviso SW:', err));
       });
     }
 
     // =========================================================================
-    // ÍNDICE LOCAL OFFLINE DE COMUNIDADES DE PROVINCIAS CENTRALES (PANAMÁ)
+    // ÍNDICE LOCAL OFFLINE DE COMUNIDADES DE PROVINCIAS CENTRALES
     // =========================================================================
     const LOCAL_PANAMA_PLACES = {
       // HERRERA
@@ -991,9 +983,6 @@
       return { lat: latCenter, lng: lngCenter };
     }
 
-    // =========================================================================
-    // CONTROL DE VISIBILIDAD DEL FORMULARIO (BOTÓN FLOTANTE)
-    // =========================================================================
     window.toggleFormVisibility = () => {
       const panel = document.getElementById('sidebarPanel');
       const text = document.getElementById('toggleFormText');
@@ -1003,9 +992,6 @@
       setTimeout(() => { map.invalidateSize(); }, 350);
     };
 
-    // =========================================================================
-    // DESCARGA OFFLINE DE MOSAICOS
-    // =========================================================================
     function lon2tile(lon, zoom) {
       return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom));
     }
@@ -1013,10 +999,11 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
+    // DESCARGA ESTRICTAMENTE PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
-        alert('Se requiere conexión a internet para descargar el mapa regional.');
+        alert('Se requiere conexión a internet para descargar el mapa de Provincias Centrales.');
         return;
       }
 
@@ -1024,11 +1011,11 @@
       const minLat = 7.2, minLon = -81.8, maxLat = 8.9, maxLon = -80.0;
       const tileUrls = [];
 
-      for (let z = 8; z <= 12; z++) {
+      for (let z = 9; z <= 12; z++) {
         const xMin = lon2tile(minLon, z);
         const xMax = lon2tile(maxLon, z);
-        yMin = lat2tile(maxLat, z);
-        yMax = lat2tile(minLat, z);
+        const yMin = lat2tile(maxLat, z);
+        const yMax = lat2tile(minLat, z);
 
         for (let x = xMin; x <= xMax; x++) {
           for (let y = yMin; y <= yMax; y++) {
@@ -1053,19 +1040,19 @@
             btn.textContent = `⏳ ${Math.round((done / tileUrls.length) * 100)}%`;
           }
         }
-        btn.textContent = '✅ Provincias Centrales Listas';
-        alert('¡Mapa de Herrera, Los Santos, Veraguas y Coclé guardado con éxito!');
+        btn.textContent = '✅ Mapa Guardado';
+        alert('¡Mapa de Provincias Centrales (Herrera, Los Santos, Veraguas y Coclé) guardado con éxito!');
       } catch (err) {
-        btn.textContent = '❌ Error de descarga';
+        btn.textContent = '❌ Error descarga';
         alert('Error descargando mapa: ' + err.message);
       }
     };
 
     // =========================================================================
-    // ALMACENAMIENTO ASÍNCRONO (IndexedDB)
+    // ALMACENAMIENTO LOCAL EN MEMORIA (IndexedDB)
     // =========================================================================
     const DB_NAME = 'BrigadasEmergencyDB';
-    const DB_VERSION = 11;
+    const DB_VERSION = 12;
     const STORE_NAME = 'reports';
 
     function openDatabase() {
@@ -1140,7 +1127,7 @@
     };
 
     // =========================================================================
-    // MAPA LEAFLET Y BÚSQUEDA INTELIGENTE
+    // MAPA LEAFLET
     // =========================================================================
     let map;
     let streetLayer;
@@ -1313,7 +1300,7 @@
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
             <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
-              📝 Editar el Formulario
+              📝 Cargar en Formulario
             </button>
           </div>
         `);
@@ -1330,10 +1317,10 @@
     async function fetchGlobalReports() {
       if (!navigator.onLine) return;
       try {
-        const res = await fetch(WEBHOOK_URL);
-        const data = await res.json();
-        if (data && Array.isArray(data)) {
-          for (const item of data) {
+        const res = await fetch(WEBHOOK_URL, { method: 'GET' });
+        const json = await res.json();
+        if (json && json.status === 'success' && Array.isArray(json.data)) {
+          for (const item of json.data) {
             item.syncStatus = 'SYNCED';
             await StorageService.saveReport(item);
           }
@@ -1344,42 +1331,57 @@
       }
     }
 
-    // SUBIDA AUTOMÁTICA EN SEGUNDO PLANO
+    // BOTÓN: SINCRONIZAR TODO (SUBE LO TUYO Y DESCARGA LO DE TODOS)
+    window.syncAllDevices = async () => {
+      const btn = document.getElementById('syncBtn');
+      if (!navigator.onLine) {
+        alert('Necesitas conexión a internet (WiFi o datos) para sincronizar con los demás dispositivos.');
+        return;
+      }
+      btn.textContent = '⏳ Sincronizando...';
+      try {
+        await triggerSync();
+        await fetchGlobalReports();
+        btn.textContent = '✅ Actualizado';
+        setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
+        alert('¡Sincronización completada! Se subieron tus datos y se descargaron los puntos de todos los brigadistas.');
+      } catch (e) {
+        btn.textContent = '❌ Error';
+        setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
+        alert('Error al sincronizar: ' + e.message);
+      }
+    };
+
+    // SUBIDA ROBUSTA
     let isSyncing = false;
     async function triggerSync() {
-  if (!navigator.onLine || isSyncing) return;
-  const pending = await StorageService.getPendingReports();
-  if (pending.length === 0) {
-    await fetchGlobalReports();
-    return;
-  }
+      if (!navigator.onLine || isSyncing) return;
+      const pending = await StorageService.getPendingReports();
+      if (pending.length === 0) {
+        await fetchGlobalReports();
+        return;
+      }
 
-  isSyncing = true;
-  try {
-    // Usamos x-www-form-urlencoded para evitar bloqueos CORS en Apps Script
-    const response = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ batch: pending })
-    });
+      isSyncing = true;
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ batch: pending })
+        });
 
-    const result = await response.json();
-
-    if (result && result.status === 'success') {
-      await StorageService.markAsSynced(pending.map(p => p.id));
-      await refreshMapAndBadges();
-      await fetchGlobalReports();
-      alert('✅ Sincronizado con éxito con Google Sheets.');
-    } else {
-      alert('⚠️ Error reportado por Google: ' + JSON.stringify(result));
+        const result = await response.json();
+        if (result && result.status === 'success') {
+          await StorageService.markAsSynced(pending.map(p => p.id));
+          await refreshMapAndBadges();
+          await fetchGlobalReports();
+        }
+      } catch (err) {
+        console.warn('Fallo en sincronización:', err);
+      } finally {
+        isSyncing = false;
+      }
     }
-  } catch (err) {
-    console.warn('Fallo de conexión:', err);
-    // Mantiene los registros en IndexedDB para intentar de nuevo
-  } finally {
-    isSyncing = false;
-  }
-}
 
     // =========================================================================
     // PROCESAMIENTO Y COMPRESIÓN DE FOTO
@@ -1733,7 +1735,6 @@
         dogsCount: parseInt(document.getElementById('dogsCount').value, 10) || 0,
         catsCount: parseInt(document.getElementById('catsCount').value, 10) || 0,
 
-        // Necesidades
         necWater: areNeedsActive && (document.getElementById('necWater').value === 'true'),
         necFood: areNeedsActive && (document.getElementById('necFood').value === 'true'),
         necHygiene: areNeedsActive && (document.getElementById('necHygiene').value === 'true'),
@@ -1743,7 +1744,6 @@
         necColchonetas: areNeedsActive && (document.getElementById('necColchonetas').value === 'true'),
         necOtherSupplies: areNeedsActive ? getSelectedChips('necOtherChips') : '',
 
-        // Entregas
         entWater: areDeliveriesActive && (document.getElementById('entWater').value === 'true'),
         entFood: areDeliveriesActive && (document.getElementById('entFood').value === 'true'),
         entHygiene: areDeliveriesActive && (document.getElementById('entHygiene').value === 'true'),
