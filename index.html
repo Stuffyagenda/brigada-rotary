@@ -72,8 +72,26 @@
       .sidebar-panel {
         width: 100%;
         min-width: 0;
-        height: 60%;
+        height: 65%;
+        min-height: 0;
+        padding: 14px 14px calc(18px + env(safe-area-inset-bottom));
         border-radius: 20px 20px 0 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+      .sidebar-panel .btn-submit {
+        position: sticky;
+        bottom: 0;
+        z-index: 30;
+        display: block;
+        flex: 0 0 auto;
+        min-height: 54px;
+        margin-top: 14px;
+        margin-bottom: 4px;
+        padding: 15px 12px;
+        box-shadow: 0 -5px 16px rgba(255,255,255,0.96), 0 4px 10px rgba(224,0,77,0.3);
+        touch-action: manipulation;
       }
       .sidebar-panel.collapsed {
         transform: translateY(100%);
@@ -82,7 +100,7 @@
       }
       .map-panel {
         width: 100%;
-        height: 40%;
+        height: 35%;
         min-height: 0;
       }
     }
@@ -1860,7 +1878,14 @@
       resetFormToDefaults();
       await refreshMapAndBadges();
       if (navigator.onLine) {
-        triggerSync();
+        const synced = await triggerSync();
+        if (synced) {
+          alert('Reporte guardado y verificado en Google Sheets.');
+        } else {
+          alert('Reporte guardado en este dispositivo, pero no se pudo confirmar todavía en Google Sheets. Quedará pendiente para reintentar la sincronización.');
+        }
+      } else {
+        alert('Reporte guardado en este dispositivo sin conexión. Se enviará a Google Sheets cuando vuelva la conexión.');
       }
       } catch (err) {
         console.error('Error guardando reporte:', err);
