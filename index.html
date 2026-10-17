@@ -506,7 +506,7 @@
 
   <div class="app-layout">
 
-    <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
+    <!-- PANEL IZQUIERDO: FORMULARIO -->
     <div id="sidebarPanel" class="sidebar-panel">
       
       <div class="rotary-header">
@@ -559,7 +559,7 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
-      <!-- FOTO: Tomar Foto o Cargar Foto -->
+      <!-- FOTO -->
       <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
@@ -591,7 +591,7 @@
         </div>
       </div>
 
-      <!-- Censo Poblacional (Todo en 0 por defecto) -->
+      <!-- Censo Poblacional -->
       <div class="section-title title-blue">
         Censo Poblacional
         <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 0</span>
@@ -633,7 +633,6 @@
         </div>
       </div>
 
-      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -673,7 +672,7 @@
         </div>
       </div>
 
-      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
+      <!-- Necesidades -->
       <div id="sectionNeeds">
         <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
 
@@ -750,19 +749,18 @@
         </div>
       </div>
 
-      <!-- INTERRUPTOR SIMÉTRICO: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
+      <!-- Interruptores de Entrega / Necesidad -->
       <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
         <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
       </div>
 
-      <!-- INTERRUPTOR SIMÉTRICO: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
       <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
         <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
       </div>
 
-      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
+      <!-- Entregas -->
       <div id="sectionDeliveries" style="display: none;">
         <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
 
@@ -845,7 +843,7 @@
       <button type="button" class="btn-submit" onclick="saveRecord()">💾 Guardar Reporte</button>
     </div>
 
-    <!-- PANEL DERECHO: MAPA LEAFLET -->
+    <!-- PANEL DERECHO: MAPA -->
     <div class="map-panel">
       
       <div class="map-top-bar">
@@ -858,7 +856,6 @@
           <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
         </div>
 
-        <!-- Buscador Inteligente -->
         <div class="search-layer-bar">
           <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
           <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
@@ -985,7 +982,6 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
-    // DESCARGA ESTRICTA: PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
@@ -1061,6 +1057,17 @@
           const store = tx.objectStore(STORE_NAME);
           const req = store.put(data);
           req.onsuccess = () => resolve(data);
+          req.onerror = (e) => reject(e.target.error);
+        });
+      },
+
+      async deleteReport(id) {
+        const db = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([STORE_NAME], 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.delete(id);
+          req.onsuccess = () => resolve(true);
           req.onerror = (e) => reject(e.target.error);
         });
       },
@@ -1197,7 +1204,7 @@
         return;
       }
 
-      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const upperTerm = term.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       for (const [name, coord] of Object.entries(LOCAL_PANAMA_PLACES)) {
         if (name.includes(upperTerm) || upperTerm.includes(name)) {
           map.setView(coord, 15);
@@ -1239,6 +1246,50 @@
       }
     };
 
+    // ELIMINACIÓN CON PIN DE SEGURIDAD
+    window.deleteLocationWithPin = async (id) => {
+      const pin = prompt('🔒 Ingresa el PIN de Administrador para eliminar este punto:');
+      if (pin === null || pin.trim() === '') return;
+
+      try {
+        if (navigator.onLine) {
+          const formData = new URLSearchParams();
+          formData.append('data', JSON.stringify({ action: 'delete', id: id, pin: pin.trim() }));
+
+          const res = await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            body: formData
+          });
+
+          const json = await res.json();
+          if (json && json.status === 'unauthorized') {
+            alert('❌ PIN Incorrecto. No tienes autorización para eliminar registros.');
+            return;
+          }
+        }
+
+        await StorageService.deleteReport(id);
+        await refreshMapAndBadges();
+        resetFormToDefaults();
+        alert('✅ Registro eliminado correctamente.');
+      } catch (err) {
+        try {
+          await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'delete', id: id, pin: pin.trim() })
+          });
+          await StorageService.deleteReport(id);
+          await refreshMapAndBadges();
+          resetFormToDefaults();
+          alert('✅ Registro eliminado correctamente.');
+        } catch (e) {
+          alert('Error al intentar eliminar: ' + e.message);
+        }
+      }
+    };
+
     async function refreshMapAndBadges() {
       if (!map) return;
       const allReports = await StorageService.getAllReports();
@@ -1277,8 +1328,12 @@
             ${r.disabledCount > 0 ? `<p><b>Discapacidad:</b> ${r.disabledCount}</p>` : ''}
             ${r.medicalCasesCount > 0 ? `<p><b>Casos Médicos:</b> ${r.medicalCasesCount} (${r.medicalConditions || 'Sin detalle'})</p>` : ''}
             ${r.photoUrl ? `<p><a href="${r.photoUrl}" target="_blank" style="color:#0284c7; font-weight:bold;">📸 Ver Foto de Casa</a></p>` : ''}
+            
             <button style="margin-top:8px; width:100%; padding:7px; background:#0284c7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.loadReportToForm('${r.id}')">
               📝 Cargar en Formulario
+            </button>
+            <button style="margin-top:6px; width:100%; padding:7px; background:#dc2626; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;" onclick="window.deleteLocationWithPin('${r.id}')">
+              🗑️ Eliminar Ubicación
             </button>
           </div>
         `);
@@ -1291,6 +1346,7 @@
       });
     }
 
+    // DESCARGA DE REPORTES GLOBALES: Refleja fielmente la hoja de Google Sheets
     async function fetchGlobalReports() {
       if (!navigator.onLine) return;
       try {
@@ -1299,11 +1355,33 @@
           redirect: 'follow'
         });
         const json = await res.json();
+        
         if (json && json.status === 'success' && Array.isArray(json.data)) {
+          const db = await openDatabase();
+          
+          const currentReports = await StorageService.getAllReports();
+          const localPending = currentReports.filter(r => r.syncStatus === 'PENDING');
+          
+          // Limpia la memoria local para que coincida exactamente con Sheets
+          const tx = db.transaction([STORE_NAME], 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          store.clear();
+          
+          await new Promise((resolve) => {
+            tx.oncomplete = () => resolve();
+          });
+
+          // Restaura los pendientes locales creados sin conexión
+          for (const pending of localPending) {
+            await StorageService.saveReport(pending);
+          }
+
+          // Carga los datos confirmados desde Google Sheets
           for (const item of json.data) {
             item.syncStatus = 'SYNCED';
             await StorageService.saveReport(item);
           }
+
           await refreshMapAndBadges();
         }
       } catch (err) {
