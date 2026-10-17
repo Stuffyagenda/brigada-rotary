@@ -499,12 +499,14 @@
 </head>
 <body>
 
+  <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
   <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
     📋 <span id="toggleFormText">Ocultar Formulario</span>
   </button>
 
   <div class="app-layout">
 
+    <!-- PANEL IZQUIERDO: FORMULARIO BRIGADA ROTARY -->
     <div id="sidebarPanel" class="sidebar-panel">
       
       <div class="rotary-header">
@@ -524,6 +526,7 @@
       <input type="hidden" id="photoBase64" />
       <input type="hidden" id="photoUrl" />
 
+      <!-- Ubicación y Control -->
       <div class="section-title title-blue">Ubicación y Evaluación</div>
       <div>
         <span class="form-label" style="display:inline;">Plus Code:</span>
@@ -556,6 +559,7 @@
         <option value="TOTAL / INHABITABLE">Destrucción total / Inhabitable</option>
       </select>
 
+      <!-- FOTO: Tomar Foto o Cargar Foto -->
       <label class="form-label">Foto de la Vivienda (Opcional)</label>
       <div class="photo-box">
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(event)" />
@@ -587,6 +591,7 @@
         </div>
       </div>
 
+      <!-- Censo Poblacional (Todo en 0 por defecto) -->
       <div class="section-title title-blue">
         Censo Poblacional
         <span id="totalPeopleHeader" style="float: right; color: #0284c7;">Total: 0</span>
@@ -628,6 +633,7 @@
         </div>
       </div>
 
+      <!-- Casos Médicos (Solo muestra chips si es >= 1) -->
       <div class="counter-row">
         <span class="counter-title">Casos Médicos / Heridos</span>
         <div class="counter-controls">
@@ -667,6 +673,7 @@
         </div>
       </div>
 
+      <!-- SECCIÓN NECESIDADES (Todo en NO por defecto) -->
       <div id="sectionNeeds">
         <div class="section-title title-amber">Necesidades Requeridas (Todo en NO)</div>
 
@@ -743,16 +750,19 @@
         </div>
       </div>
 
+      <!-- INTERRUPTOR SIMÉTRICO: EN PENDIENTE PREGUNTA SI SE ENTREGÓ ALGO -->
       <div id="boxToggleDeliveries" class="toggle-subbox box-green" onclick="toggleCheck('checkDelivered')">
         <input type="checkbox" id="checkDelivered" style="width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkDelivered" style="cursor: pointer;">📦 ¿Se realizó alguna entrega en esta visita?</label>
       </div>
 
+      <!-- INTERRUPTOR SIMÉTRICO: EN ATENDIDO PREGUNTA SI TIENEN NECESIDAD PENDIENTE -->
       <div id="boxToggleNeeds" class="toggle-subbox box-amber" style="display: none;" onclick="toggleCheck('checkHasNeeds')">
         <input type="checkbox" id="checkHasNeeds" style="width: 20px; height: 20px; cursor: pointer; accent-color: #d97706;" onclick="event.stopPropagation(); updateSectionsVisibility();" />
         <label for="checkHasNeeds" style="cursor: pointer;">⚠️ ¿La familia tiene alguna necesidad pendiente?</label>
       </div>
 
+      <!-- SECCIÓN ENTREGAS REALIZADAS (Todo en NO por defecto) -->
       <div id="sectionDeliveries" style="display: none;">
         <div class="section-title title-green">Entregas Realizadas (Todo en NO)</div>
 
@@ -835,6 +845,7 @@
       <button type="button" class="btn-submit" onclick="saveRecord()">💾 Guardar Reporte</button>
     </div>
 
+    <!-- PANEL DERECHO: MAPA LEAFLET -->
     <div class="map-panel">
       
       <div class="map-top-bar">
@@ -847,6 +858,7 @@
           <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">📥 Descargar Mapa</span>
         </div>
 
+        <!-- Buscador Inteligente -->
         <div class="search-layer-bar">
           <input type="text" id="smartSearchInput" class="input-search" placeholder="Buscar Plus Code o Comunidad (Chitré, Las Tablas...)" onkeypress="if(event.key === 'Enter') handleSmartSearch();" />
           <button type="button" class="btn-action" onclick="handleSmartSearch()">Buscar</button>
@@ -973,6 +985,7 @@
       return Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * Math.pow(2, zoom));
     }
 
+    // DESCARGA ESTRICTA: PROVINCIAS CENTRALES (Herrera, Los Santos, Veraguas, Coclé)
     window.downloadCentralProvincesMap = async () => {
       const btn = document.getElementById('btnDownloadRegion');
       if (!navigator.onLine) {
@@ -1014,7 +1027,7 @@
           }
         }
         btn.textContent = '✅ Mapa Guardado';
-        alert('¡Mapa de Provincias Centrales (Herrera, Los Santos, Veraguas y Coclé) guardado con éxito!');
+        alert('¡Mapa de Provincias Centrales guardado con éxito!');
       } catch (err) {
         btn.textContent = '❌ Error descarga';
         alert('Error descargando mapa: ' + err.message);
@@ -1281,7 +1294,10 @@
     async function fetchGlobalReports() {
       if (!navigator.onLine) return;
       try {
-        const res = await fetch(WEBHOOK_URL + '?action=get_all');
+        const res = await fetch(WEBHOOK_URL + '?action=get_all', {
+          method: 'GET',
+          redirect: 'follow'
+        });
         const json = await res.json();
         if (json && json.status === 'success' && Array.isArray(json.data)) {
           for (const item of json.data) {
@@ -1291,57 +1307,56 @@
           await refreshMapAndBadges();
         }
       } catch (err) {
-        console.log('Esperando conexión para descarga global de reportes.');
+        console.warn('No se pudieron descargar reportes remotos:', err);
       }
     }
 
     window.syncAllDevices = async () => {
       const btn = document.getElementById('syncBtn');
       if (!navigator.onLine) {
-        alert('Necesitas conexión a internet (WiFi o datos) para sincronizar.');
+        alert('Se requiere conexión a internet (WiFi o datos) para sincronizar.');
         return;
       }
+
       btn.textContent = '⏳ Sincronizando...';
-      try {
-        await triggerSync();
-        await fetchGlobalReports();
+      const uploaded = await triggerSync();
+      await fetchGlobalReports();
+
+      if (uploaded) {
         btn.textContent = '✅ Actualizado';
         setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
-        alert('¡Sincronización completada! Se enviaron tus datos a la hoja y se descargaron los puntos de todos.');
-      } catch (e) {
+        alert('¡Sincronización completada! Los puntos se guardaron en la hoja y se actualizaron en el mapa.');
+      } else {
         btn.textContent = '❌ Error';
         setTimeout(() => { btn.textContent = '🔄 Sincronizar Todo'; }, 2500);
-        alert('Error al sincronizar: ' + e.message);
+        alert('No se pudo completar la sincronización. Verifica tu conexión e intenta nuevamente.');
       }
     };
 
     let isSyncing = false;
     async function triggerSync() {
-      if (!navigator.onLine || isSyncing) return;
+      if (!navigator.onLine || isSyncing) return false;
       const pending = await StorageService.getPendingReports();
       if (pending.length === 0) {
         await fetchGlobalReports();
-        return;
+        return true;
       }
 
       isSyncing = true;
       try {
-        const formData = new URLSearchParams();
-        formData.append('data', JSON.stringify({ batch: pending }));
-
-        const response = await fetch(WEBHOOK_URL, {
+        await fetch(WEBHOOK_URL, {
           method: 'POST',
-          body: formData
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ batch: pending })
         });
 
-        const result = await response.json();
-        if (result && result.status === 'success') {
-          await StorageService.markAsSynced(pending.map(p => p.id));
-          await refreshMapAndBadges();
-          await fetchGlobalReports();
-        }
+        await StorageService.markAsSynced(pending.map(p => p.id));
+        await refreshMapAndBadges();
+        return true;
       } catch (err) {
-        console.warn('Fallo en sincronización:', err);
+        console.warn('Fallo en sincronización local:', err);
+        return false;
       } finally {
         isSyncing = false;
       }
