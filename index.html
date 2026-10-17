@@ -23,6 +23,37 @@
       background-color: #0f172a;
     }
 
+
+    /* Acceso compartido: cubre toda la aplicación hasta validar la sesión. */
+    #authGate {
+      position: fixed; inset: 0; z-index: 99999; display: flex;
+      align-items: center; justify-content: center; padding: 22px;
+      background: radial-gradient(circle at top, #1e3a5f 0%, #0f172a 68%);
+    }
+    #authGate[hidden] { display: none !important; }
+    .auth-card {
+      width: 100%; max-width: 390px; background: #fff; border-radius: 20px;
+      padding: 28px 24px; box-shadow: 0 22px 70px rgba(0,0,0,.35); text-align: center;
+    }
+    .auth-wheel {
+      width: 68px; height: 68px; border-radius: 50%; margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; background: #e0004d; font-size: 34px; font-weight: 800;
+      border: 4px solid #f6c445; box-shadow: inset 0 0 0 4px #e0004d;
+    }
+    .auth-card h1 { color: #0f172a; font-size: 25px; margin-bottom: 5px; }
+    .auth-card p { color: #64748b; font-size: 13px; line-height: 1.45; margin-bottom: 20px; }
+    .auth-card label { display:block; text-align:left; font-size:13px; font-weight:700; color:#334155; margin-bottom:7px; }
+    #sharedPasswordInput {
+      width:100%; padding:13px 12px; border:1px solid #cbd5e1; border-radius:10px;
+      font-size:16px; outline:none; margin-bottom:12px;
+    }
+    #sharedPasswordInput:focus { border-color:#0284c7; box-shadow:0 0 0 3px rgba(2,132,199,.12); }
+    #authSubmitBtn { width:100%; border:0; border-radius:10px; padding:13px; background:#e0004d; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
+    #authSubmitBtn:disabled { opacity:.65; cursor:wait; }
+    #authMessage { min-height:18px; margin:12px 0 0; color:#b91c1c; font-size:12px; }
+    #logoutBtn { position:fixed; top:10px; right:10px; z-index:1000; padding:8px 10px; border:0; border-radius:9px; background:#0f172a; color:white; font-size:12px; font-weight:700; cursor:pointer; }
+
     .app-layout {
       display: flex;
       height: 100vh;
@@ -518,6 +549,21 @@
   </style>
 </head>
 <body>
+  <section id="authGate" aria-label="Acceso a Brigada Rotary">
+    <div class="auth-card">
+      <div class="auth-wheel" aria-hidden="true">⚙</div>
+      <h1>Brigada Rotary</h1>
+      <p>Acceso exclusivo para el equipo de respuesta humanitaria.</p>
+      <form id="authForm">
+        <label for="sharedPasswordInput">Contraseña del equipo</label>
+        <input id="sharedPasswordInput" type="password" autocomplete="current-password" required minlength="8" placeholder="Ingresa la contraseña" />
+        <button id="authSubmitBtn" type="submit">Ingresar</button>
+        <div id="authMessage" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </section>
+  <button id="logoutBtn" type="button" onclick="logoutBrigada()" hidden>Cerrar sesión</button>
+
 
   <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
   <button type="button" class="btn-toggle-form" onclick="toggleFormVisibility()">
@@ -904,6 +950,94 @@
   <script>
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzgIoplOrq7WHn_WKdnNZwBTwmrblXF13SNaU56COhlLcPJsBEqjIYBOlCib0ynZBng/exec';
 
+    const AUTH_TOKEN_KEY = 'brigada_rotary_auth_token_v1';
+    const AUTH_EXPIRY_KEY = 'brigada_rotary_auth_expiry_v1';
+    const AUTH_SESSION_MS = 6 * 60 * 60 * 1000;
+
+    function getAuthToken() {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+      const expiry = Number(localStorage.getItem(AUTH_EXPIRY_KEY) || 0);
+      if (!token || !expiry || Date.now() >= expiry) {
+        clearAuthSession();
+        return '';
+      }
+      return token;
+    }
+
+    function clearAuthSession() {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_EXPIRY_KEY);
+    }
+
+    function showAuthGate(message) {
+      document.getElementById('authGate').hidden = false;
+      document.getElementById('logoutBtn').hidden = true;
+      document.getElementById('authMessage').textContent = message || '';
+    }
+
+    function unlockApp(token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      localStorage.setItem(AUTH_EXPIRY_KEY, String(Date.now() + AUTH_SESSION_MS));
+      document.getElementById('authGate').hidden = true;
+      document.getElementById('logoutBtn').hidden = false;
+      document.getElementById('sharedPasswordInput').value = '';
+      document.getElementById('authMessage').textContent = '';
+    }
+
+    window.logoutBrigada = function() {
+      clearAuthSession();
+      showAuthGate('Sesión cerrada. Ingresa la contraseña para continuar.');
+      document.getElementById('sharedPasswordInput').focus();
+    };
+
+    document.getElementById('authForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const input = document.getElementById('sharedPasswordInput');
+      const button = document.getElementById('authSubmitBtn');
+      const message = document.getElementById('authMessage');
+      const password = input.value;
+      if (!password) { message.textContent = 'Escribe la contraseña.'; return; }
+      if (!navigator.onLine) {
+        message.textContent = 'El primer acceso requiere internet. Si ya habías iniciado sesión en este dispositivo, recarga la app.';
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'Verificando…';
+      message.textContent = '';
+      try {
+        // La contraseña solo se envía al servidor durante el inicio de sesión; no se guarda en el dispositivo.
+        const url = WEBHOOK_URL + '?action=login&password=' + encodeURIComponent(password) + '&_=' + Date.now();
+        const response = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' });
+        const result = await response.json();
+        if (!response.ok || !result || result.status !== 'success' || !result.token) {
+          throw new Error((result && result.message) || 'Contraseña incorrecta.');
+        }
+        unlockApp(result.token);
+        await fetchGlobalReports();
+        await refreshMapAndBadges();
+      } catch (error) {
+        message.textContent = error.message || 'No se pudo verificar. Comprueba la conexión e inténtalo de nuevo.';
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Ingresar';
+      }
+    });
+
+    // Una sesión vigente permite abrir la interfaz offline; la sincronización requiere token válido en servidor.
+    if (getAuthToken()) {
+      document.getElementById('authGate').hidden = true;
+      document.getElementById('logoutBtn').hidden = false;
+    }
+
+    function authQuery() {
+      const token = getAuthToken();
+      if (!token) {
+        showAuthGate('La sesión venció. Ingresa nuevamente cuando tengas conexión.');
+        throw new Error('Sesión no válida.');
+      }
+      return 'token=' + encodeURIComponent(token);
+    }
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
@@ -1253,7 +1387,7 @@
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'delete', id: String(id), pin: pin.trim() })
+          body: JSON.stringify({ action: 'delete', id: String(id), pin: pin.trim(), token: getAuthToken() })
         });
         const remoteReports = await fetchGlobalReports();
         if (!Array.isArray(remoteReports)) throw new Error('No se pudo verificar la respuesta del servidor.');
@@ -1349,13 +1483,18 @@
     async function fetchGlobalReports() {
       if (!navigator.onLine) return null;
       try {
-        const res = await fetch(WEBHOOK_URL + '?action=get_all', {
+        const res = await fetch(WEBHOOK_URL + '?action=get_all&' + authQuery(), {
           method: 'GET',
           redirect: 'follow',
           cache: 'no-store'
         });
         if (!res.ok) throw new Error('El servidor respondió HTTP ' + res.status);
         const json = await res.json();
+        if (json && json.status === 'unauthorized') {
+          clearAuthSession();
+          showAuthGate('La sesión venció o fue revocada. Ingresa nuevamente.');
+          throw new Error('Sesión vencida o inválida.');
+        }
         if (!json || json.status !== 'success' || !Array.isArray(json.data)) {
           throw new Error((json && json.message) || 'Respuesta inválida del servidor.');
         }
@@ -1431,7 +1570,7 @@
               method: 'POST',
               mode: 'no-cors',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify(item)
+              body: JSON.stringify({ ...item, token: getAuthToken() })
             });
           } catch (sendError) {
             console.warn('No se pudo enviar el reporte ' + item.id + ':', sendError);
