@@ -12,6 +12,29 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
+
+    .records-btn, .install-app-btn { position: fixed; z-index: 1200; border: 0; border-radius: 12px; padding: 11px 14px; font-size: 13px; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; touch-action: manipulation; }
+    .records-btn { top: 12px; right: 12px; background: #0f766e; color: #fff; }
+    .install-app-btn { right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); background: #e0004d; color: #fff; }
+    .records-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(15,23,42,.72); display: none; align-items: center; justify-content: center; padding: 14px; }
+    .records-overlay.open { display: flex; }
+    .records-dialog { width: min(760px, 100%); max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; background: #fff; color: #0f172a; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    .records-head { display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid #e2e8f0; }
+    .records-head h2 { font-size:18px; flex:1; }
+    .records-close { border:0; background:#e2e8f0; color:#0f172a; border-radius:9px; padding:8px 11px; font-weight:800; cursor:pointer; }
+    .records-tools { display:flex; gap:8px; padding:12px 16px; border-bottom:1px solid #e2e8f0; }
+    .records-tools input { flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:9px; padding:11px; font-size:16px; }
+    .records-list { overflow-y:auto; padding:12px; }
+    .record-item { border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px; }
+    .record-item-title { font-weight:800; margin-bottom:5px; overflow-wrap:anywhere; }
+    .record-meta { font-size:12px; color:#475569; line-height:1.5; overflow-wrap:anywhere; }
+    .record-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .record-actions button { border:0; border-radius:8px; padding:9px 11px; font-size:12px; font-weight:800; cursor:pointer; touch-action:manipulation; }
+    .record-edit { background:#0284c7; color:white; }
+    .record-map { background:#e2e8f0; color:#0f172a; }
+    .records-empty { padding:24px 12px; text-align:center; color:#64748b; }
+    @media (max-width: 900px) { .records-btn { top: 12px; right: 10px; } .install-app-btn { bottom: calc(12px + env(safe-area-inset-bottom)); } .records-dialog { max-height: 92vh; } .records-head h2 { font-size:16px; } }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%;
@@ -563,6 +586,15 @@
     </div>
   </section>
   <button id="logoutBtn" type="button" onclick="logoutBrigada()" hidden>Cerrar sesión</button>
+  <button id="recordsBtn" class="records-btn" type="button" onclick="openRecords()">📚 Mis registros</button>
+  <button id="installAppBtn" class="install-app-btn" type="button" onclick="installBrigadaApp()" hidden>⬇️ Instalar aplicación</button>
+  <section id="recordsOverlay" class="records-overlay" role="dialog" aria-modal="true" aria-labelledby="recordsTitle" onclick="if(event.target===this) closeRecords()">
+    <div class="records-dialog">
+      <div class="records-head"><h2 id="recordsTitle">📚 Mis registros de ubicaciones</h2><button class="records-close" type="button" onclick="closeRecords()">Cerrar ✕</button></div>
+      <div class="records-tools"><input id="recordsSearch" type="search" placeholder="Buscar contacto, teléfono o estado..." oninput="renderRecordsList()"/><button class="records-close" type="button" onclick="reloadRecords()">↻ Actualizar</button></div>
+      <div id="recordsList" class="records-list"><div class="records-empty">Cargando registros…</div></div>
+    </div>
+  </section>
 
 
   <!-- BOTÓN FLOTANTE: OCULTAR / VER FORMULARIO -->
@@ -1040,7 +1072,7 @@
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then(() => console.log('Service Worker registrado'))
           .catch((err) => console.warn('Aviso SW:', err));
       });
@@ -2055,6 +2087,90 @@
         if (saveButton) { saveButton.disabled = false; saveButton.textContent = '💾 Guardar Reporte'; }
       }
     };
+
+
+    // Registros: lista local primero; intenta actualizar desde Google Sheets cuando haya conexión.
+    window.openRecords = async () => {
+      document.getElementById('recordsOverlay').classList.add('open');
+      document.getElementById('recordsSearch').value = '';
+      document.getElementById('recordsList').innerHTML = '<div class="records-empty">Cargando registros…</div>';
+      if (navigator.onLine && getAuthToken()) await fetchGlobalReports();
+      await renderRecordsList();
+    };
+    window.closeRecords = () => document.getElementById('recordsOverlay').classList.remove('open');
+    window.reloadRecords = async () => {
+      const list = document.getElementById('recordsList');
+      list.innerHTML = '<div class="records-empty">Actualizando…</div>';
+      if (navigator.onLine && getAuthToken()) await fetchGlobalReports();
+      await renderRecordsList();
+    };
+    window.renderRecordsList = async () => {
+      const list = document.getElementById('recordsList');
+      if (!list) return;
+      const query = (document.getElementById('recordsSearch')?.value || '').trim().toLocaleLowerCase('es');
+      const reports = await StorageService.getAllReports();
+      reports.sort((a,b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+      const filtered = reports.filter(r => [r.contactName, r.contactPhone, r.brigadista, r.status, r.plusCode, r.id].some(v => String(v || '').toLocaleLowerCase('es').includes(query)));
+      if (!filtered.length) {
+        list.innerHTML = '<div class="records-empty">' + (reports.length ? 'No hay registros que coincidan con la búsqueda.' : 'Todavía no hay registros guardados en este dispositivo. Con conexión, pulsa Actualizar para traer los registros del servidor.') + '</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(r => {
+        const title = escapeHtml(r.contactName || ('Registro ' + String(r.id).slice(0,8)));
+        const lat = Number(r.lat), lng = Number(r.lng);
+        const coords = Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : 'Sin coordenadas válidas';
+        const status = r.syncStatus === 'PENDING' ? 'Pendiente de sincronizar' : 'Sincronizado';
+        const date = r.updatedAt || r.createdAt ? new Date(r.updatedAt || r.createdAt).toLocaleString('es-PA') : 'Fecha no disponible';
+        return `<article class="record-item"><div class="record-item-title">${title}</div><div class="record-meta">Teléfono: ${escapeHtml(r.contactPhone || 'No indicado')}<br>Estado: ${escapeHtml(r.status || 'Sin estado')} · ${escapeHtml(status)}<br>Coordenadas: ${escapeHtml(coords)}<br>Plus Code: ${escapeHtml(r.plusCode || 'No disponible')}<br>Actualizado: ${escapeHtml(date)}</div><div class="record-actions"><button class="record-edit" type="button" onclick="editRecordLocation(${JSON.stringify(String(r.id))})">✏️ Editar registro / ubicación</button><button class="record-map" type="button" onclick="showRecordOnMap(${JSON.stringify(String(r.id))})">📍 Ver en mapa</button></div></article>`;
+      }).join('');
+    };
+    window.editRecordLocation = async (id) => {
+      closeRecords();
+      await window.loadReportToForm(id);
+      alert('Se cargó el registro existente. Para corregir la ubicación, toca el punto correcto en el mapa o usa “Mi Ubicación” y luego pulsa “Guardar Reporte”. Se actualizará el mismo registro.');
+    };
+    window.showRecordOnMap = async (id) => {
+      const reports = await StorageService.getAllReports();
+      const r = reports.find(item => String(item.id) === String(id));
+      if (!r) return;
+      const lat = Number(r.lat), lng = Number(r.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180) { alert('Este registro no tiene coordenadas válidas. Usa Editar registro para corregirlas.'); return; }
+      closeRecords();
+      if (map) { map.setView([lat,lng], 17); }
+      const panel = document.getElementById('sidebarPanel');
+      if (window.innerWidth <= 900 && panel) panel.classList.add('collapsed');
+      setTimeout(() => { if (map) map.invalidateSize(); }, 250);
+      await refreshMapAndBadges();
+    };
+
+    // Instalación PWA compatible con el diálogo nativo de Android/Chrome.
+    let deferredInstallPrompt = null;
+    const installButton = document.getElementById('installAppBtn');
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      if (installButton) installButton.hidden = false;
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      if (installButton) installButton.hidden = true;
+    });
+    window.installBrigadaApp = async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        if (installButton) installButton.hidden = true;
+        return;
+      }
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (isIOS) alert('Para instalar en iPhone: abre esta página en Safari, pulsa Compartir y selecciona “Añadir a pantalla de inicio”.');
+      else alert('Si no aparece el instalador automático, abre Brigada Rotary en Chrome, toca el menú ⋮ y selecciona “Instalar aplicación” o “Añadir a pantalla de inicio”. Verifica que la página esté abierta mediante HTTPS.');
+    };
+    // Muestra el botón en Android cuando la PWA aún no está instalada, incluso si Chrome no dispara el evento.
+    if (/(android|iphone|ipad|ipod)/i.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches) {
+      if (installButton) installButton.hidden = false;
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
       initMap();

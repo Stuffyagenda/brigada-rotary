@@ -10,11 +10,18 @@
   "orientation": "any",
   "background_color": "#0f172a",
   "theme_color": "#e0004d",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "icons/brigada-rotary.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icons/brigada-rotary-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/brigada-rotary-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
