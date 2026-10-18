@@ -13,8 +13,10 @@
 
   <style>
 
+    button, input, select, textarea { font-family: inherit; }
+    button { font-size: 14px; }
     .records-btn, .install-app-btn { position: fixed; z-index: 1200; border: 0; border-radius: 12px; padding: 11px 14px; font-size: 13px; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,.25); cursor: pointer; touch-action: manipulation; }
-    .records-btn { top: 12px; right: 12px; background: #0f766e; color: #fff; }
+    .records-btn { background: #0f766e; color: #fff; white-space: nowrap; }
     .install-app-btn { right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); background: #e0004d; color: #fff; }
     .records-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(15,23,42,.72); display: none; align-items: center; justify-content: center; padding: 14px; }
     .records-overlay.open { display: flex; }
@@ -29,13 +31,14 @@
     .record-item-title { font-weight:800; margin-bottom:5px; overflow-wrap:anywhere; }
     .record-meta { font-size:12px; color:#475569; line-height:1.5; overflow-wrap:anywhere; }
     .record-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-    .record-actions button { border:0; border-radius:8px; padding:9px 11px; font-size:12px; font-weight:800; cursor:pointer; touch-action:manipulation; }
+    .record-actions button { border:0; border-radius:8px; padding:9px 11px; font-size:14px; font-weight:800; cursor:pointer; touch-action:manipulation; }
     .record-edit { background:#0284c7; color:white; }
     .record-map { background:#e2e8f0; color:#0f172a; }
     .records-empty { padding:24px 12px; text-align:center; color:#64748b; }
-    @media (max-width: 900px) { .records-btn { top: 12px; right: 10px; } .install-app-btn { bottom: calc(12px + env(safe-area-inset-bottom)); } .records-dialog { max-height: 92vh; } .records-head h2 { font-size:16px; } }
+    @media (max-width: 900px) { .records-btn { align-self:flex-start; } .install-app-btn { bottom: calc(12px + env(safe-area-inset-bottom)); } .records-dialog { max-height: 92vh; } .records-head h2 { font-size:16px; } }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    button { font-family: inherit; }
     html, body {
       height: 100%;
       width: 100%;
@@ -75,7 +78,7 @@
     #authSubmitBtn { width:100%; border:0; border-radius:10px; padding:13px; background:#e0004d; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
     #authSubmitBtn:disabled { opacity:.65; cursor:wait; }
     #authMessage { min-height:18px; margin:12px 0 0; color:#b91c1c; font-size:12px; }
-    #logoutBtn { position:fixed; top:10px; right:10px; z-index:1000; padding:8px 10px; border:0; border-radius:9px; background:#0f172a; color:white; font-size:12px; font-weight:700; cursor:pointer; }
+    #logoutBtn { position:fixed; top:10px; right:10px; z-index:1300; padding:8px 10px; border:0; border-radius:9px; background:#0f172a; color:white; font-size:12px; font-weight:700; cursor:pointer; }
 
     .app-layout {
       display: flex;
@@ -210,6 +213,9 @@
       gap: 6px;
     }
 
+    .map-action-stack { position:absolute; top:112px; right:12px; z-index:1100; display:flex; flex-direction:column; align-items:flex-end; gap:8px; max-width:calc(100% - 24px); }
+    .map-action-stack .btn-gps { position:static !important; max-width:100%; white-space:normal; }
+    .map-click-mode.active { background:#b45309 !important; color:#fff !important; }
     .map-top-bar {
       position: absolute;
       top: 10px;
@@ -222,10 +228,9 @@
       pointer-events: none;
     }
     @media (max-width: 900px) {
-      .map-top-bar {
-        left: 10px;
-        top: 50px;
-      }
+      .map-action-stack { top: 170px; right: 10px; }
+      .map-top-bar { left: 10px; top: 50px; right: 10px; }
+      .records-btn { align-self: flex-start; }
     }
 
     .badge-group {
@@ -251,7 +256,6 @@
     .badge-offline { background-color: #dc2626; }
     .badge-sync { background-color: #0284c7; cursor: pointer; }
     .badge-stats { background-color: #334155; }
-    .records-map-btn { border: 0; font: inherit; cursor: pointer; touch-action: manipulation; }
     .badge-download {
       background-color: #7c3aed;
       cursor: pointer;
@@ -951,7 +955,7 @@
           <span id="syncBadge" class="badge badge-stats">0 pendientes</span>
           <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
           <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-          <button id="recordsBtn" class="badge badge-download records-map-btn" type="button" onclick="openRecords()" title="Ver, buscar y editar ubicaciones registradas">📚 Mis registros</button>
+          <button id="recordsBtn" class="records-btn" type="button" onclick="openRecords()">📚 Mis registros</button>
         </div>
 
         <div class="search-layer-bar">
@@ -964,9 +968,10 @@
         </div>
       </div>
 
-      <button type="button" class="btn-gps" onclick="goToMyLocation()">
-        📍 Mi Ubicación
-      </button>
+      <div class="map-action-stack">
+        <button type="button" class="btn-gps" onclick="goToMyLocation()">📍 Mi Ubicación</button>
+        <button type="button" id="mapClickModeBtn" class="btn-gps map-click-mode" aria-pressed="false" onclick="toggleMapClickMode()">📌 Activar selección en mapa</button>
+      </div>
 
       <div class="filter-bar">
         <button class="filter-btn active" onclick="setFilter('ALL', event)">Todos</button>
@@ -1012,13 +1017,20 @@
       localStorage.setItem(AUTH_EXPIRY_KEY, String(Date.now() + AUTH_SESSION_MS));
       document.getElementById('authGate').hidden = true;
       document.getElementById('logoutBtn').hidden = false;
+      document.getElementById('recordsBtn').hidden = false;
       document.getElementById('sharedPasswordInput').value = '';
       document.getElementById('authMessage').textContent = '';
     }
 
     window.logoutBrigada = function() {
       clearAuthSession();
-      showAuthGate('Sesión cerrada. Ingresa la contraseña para continuar.');
+      closeRecords();
+      document.getElementById('authGate').hidden = false;
+      document.getElementById('logoutBtn').hidden = true;
+      document.getElementById('recordsBtn').hidden = true;
+      document.getElementById('installAppBtn').hidden = true;
+      document.getElementById('authMessage').textContent = 'Sesión cerrada. Ingresa la contraseña para continuar.';
+      document.getElementById('sharedPasswordInput').value = '';
       document.getElementById('sharedPasswordInput').focus();
     };
 
@@ -1299,6 +1311,8 @@
     let layerPending;
     let layerAttended;
     let currentMarker = null;
+    let mapClickModeEnabled = false;
+    let recordFocusMarker = null;
 
     function initMap() {
       streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>' });
@@ -1314,6 +1328,7 @@
       layerAttended = L.layerGroup().addTo(map);
 
       map.on('click', (e) => {
+        if (!mapClickModeEnabled) return;
         setLocationInForm(e.latlng.lat, e.latlng.lng);
       });
 
@@ -1322,6 +1337,17 @@
       refreshMapAndBadges();
       fetchGlobalReports();
     }
+
+    window.toggleMapClickMode = () => {
+      mapClickModeEnabled = !mapClickModeEnabled;
+      const btn = document.getElementById('mapClickModeBtn');
+      if (btn) {
+        btn.classList.toggle('active', mapClickModeEnabled);
+        btn.setAttribute('aria-pressed', String(mapClickModeEnabled));
+        btn.textContent = mapClickModeEnabled ? '✋ Desactivar selección en mapa' : '📌 Activar selección en mapa';
+      }
+      if (map) map.getContainer().style.cursor = mapClickModeEnabled ? 'crosshair' : '';
+    };
 
     function setLocationInForm(lat, lng) {
       const code = encodePlusCode(lat, lng);
@@ -2163,9 +2189,13 @@
         if (!loaded) return;
         closeRecords();
         const panel = document.getElementById('sidebarPanel');
-        if (panel && window.innerWidth <= 900) panel.classList.remove('collapsed');
-        if (map) setTimeout(() => map.invalidateSize(), 200);
-        alert('Registro cargado para editar. Modifica los campos que necesites. Para cambiar la ubicación, toca el punto correcto en el mapa o usa “Mi Ubicación”. Al guardar, te pediremos confirmar los cambios.');
+        if (panel) panel.classList.remove('collapsed');
+        document.getElementById('toggleFormText').textContent = 'Ocultar Formulario';
+        if (map) setTimeout(() => map.invalidateSize(), 250);
+        if (window.innerWidth <= 900) { panel?.scrollTo({top:0, behavior:'smooth'}); }
+        const nameField = document.getElementById('contactName');
+        if (nameField) setTimeout(() => nameField.focus({preventScroll:true}), 300);
+        alert('Registro cargado en el formulario. Edita los campos y pulsa “Guardar Reporte”. Para cambiar la ubicación, activa primero “Activar selección en mapa” y luego toca el punto correcto.');
       } catch (err) {
         console.error('No se pudo cargar el registro para editar:', err);
         alert('No se pudo abrir este registro para editar. Pulsa “Actualizar” e inténtalo nuevamente.');
@@ -2186,6 +2216,9 @@
         if (window.innerWidth <= 900 && panel) panel.classList.add('collapsed');
         if (map) {
           map.setView([lat, lng], 17, { animate: true });
+          if (recordFocusMarker) map.removeLayer(recordFocusMarker);
+          recordFocusMarker = L.circleMarker([lat, lng], {radius:11, color:'#ffffff', weight:3, fillColor:'#e0004d', fillOpacity:1}).addTo(map);
+          recordFocusMarker.bindTooltip(escapeHtml(r.contactName || 'Ubicación del registro'), {permanent:false, direction:'top'}).openTooltip();
           setTimeout(() => { if (map) map.invalidateSize(); }, 250);
         } else {
           alert('El mapa todavía se está cargando. Espera un momento e inténtalo de nuevo.');
