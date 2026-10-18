@@ -251,6 +251,7 @@
     .badge-offline { background-color: #dc2626; }
     .badge-sync { background-color: #0284c7; cursor: pointer; }
     .badge-stats { background-color: #334155; }
+    .records-map-btn { border: 0; font: inherit; cursor: pointer; touch-action: manipulation; }
     .badge-download {
       background-color: #7c3aed;
       cursor: pointer;
@@ -586,7 +587,6 @@
     </div>
   </section>
   <button id="logoutBtn" type="button" onclick="logoutBrigada()" hidden>Cerrar sesión</button>
-  <button id="recordsBtn" class="records-btn" type="button" onclick="openRecords()">📚 Mis registros</button>
   <button id="installAppBtn" class="install-app-btn" type="button" onclick="installBrigadaApp()" hidden>⬇️ Instalar aplicación</button>
   <section id="recordsOverlay" class="records-overlay" role="dialog" aria-modal="true" aria-labelledby="recordsTitle" onclick="if(event.target===this) closeRecords()">
     <div class="records-dialog">
@@ -951,7 +951,7 @@
           <span id="syncBadge" class="badge badge-stats">0 pendientes</span>
           <span id="placesBadge" class="badge badge-stats">🏠 0 Lugares</span>
           <span id="peopleBadge" class="badge badge-stats">👥 0 Personas</span>
-          <span id="btnDownloadRegion" class="badge badge-download" onclick="downloadCentralProvincesMap()">🗺️ Mapa sin conexión</span>
+          <button id="recordsBtn" class="badge badge-download records-map-btn" type="button" onclick="openRecords()" title="Ver, buscar y editar ubicaciones registradas">📚 Mis registros</button>
         </div>
 
         <div class="search-layer-bar">

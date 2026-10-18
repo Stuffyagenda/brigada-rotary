@@ -1,116 +1,118 @@
+/* Service Worker - Brigada Rotary
+ * Cachea la estructura de la aplicación y recursos estáticos.
+ * No almacena respuestas privadas de Google Apps Script ni descarga teselas masivamente.
+ */
+'use strict';
 
-/* =========================================================
-   BRIGADA ROTARY - SERVICE WORKER
-   Version: v18
-   Mantiene la caché de runtime y los datos locales.
-   ========================================================= */
-
-const APP_CACHE = 'brigada-rotary-v18';
+const APP_CACHE = 'brigada-rotary-app-v18';
 const RUNTIME_CACHE = 'brigada-rotary-runtime-v1';
-const TILES_CACHE = 'osm-tiles-offline-v1';
+const APP_SHELL = ['./', './index.html', './manifest.json', './icons/brigada-rotary.svg', './icons/brigada-rotary-192.png', './icons/brigada-rotary-512.png'];
 
-const APP_FILES = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-
-/* INSTALACIÓN */
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(APP_CACHE)
-      .then((cache) => cache.addAll(APP_FILES))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(APP_CACHE);
+    await cache.addAll(APP_SHELL);
+    await self.skipWaiting();
+  })());
 });
 
-/* ACTIVACIÓN */
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys
-          .filter((key) =>
-            key.startsWith('brigada-rotary-v') &&
-            key !== APP_CACHE &&
-            key !== RUNTIME_CACHE
-          )
-          .map((key) => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys
+      .filter(key => key.startsWith('brigada-rotary-') && ![APP_CACHE, RUNTIME_CACHE].includes(key))
+      .map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
-/* COMUNICACIÓN PARA ACTUALIZAR */
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+function isGoogleService(url) {
+  return /(^|\.)google(script|usercontent)?\.com$/i.test(url.hostname) ||
+    /(^|\.)googleapis\.com$/i.test(url.hostname) ||
+    /script\.google\.com$/i.test(url.hostname);
+}
 
-/* PETICIONES Y FUNCIONAMIENTO OFFLINE */
-self.addEventListener('fetch', (event) => {
+function isMapTile(url) {
+  return url.hostname === 'tile.openstreetmap.org' ||
+    url.hostname.endsWith('.tile.openstreetmap.org') ||
+    url.hostname === 'server.arcgisonline.com';
+}
+
+self.addEventListener('fetch', event => {
   const request = event.request;
-
   if (request.method !== 'GET') return;
 
-  const url = new URL(request.url);
+  let url;
+  try { url = new URL(request.url); } catch (_) { return; }
 
-  // No interceptar servicios externos ni envíos de formularios.
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  // No interceptar la API de Google: evita guardar datos de emergencia en caché por accidente.
+  if (isGoogleService(url)) return;
 
-  // Archivos principales de la aplicación:
-  // intenta obtener la versión nueva y conserva una copia offline.
-  if (
-    url.origin === self.location.origin &&
-    (
-      url.pathname.endsWith('/index.html') ||
-      url.pathname.endsWith('/manifest.json') ||
-      url.pathname.endsWith('/sw.js') ||
-      url.pathname.endsWith('/')
-    )
-  ) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(APP_CACHE)
-              .then((cache) => cache.put(request, copy))
-              .catch(() => {});
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
+  // Las teselas se solicitan directamente al proveedor y no se guardan para uso offline.
+  // OpenStreetMap público no autoriza la descarga masiva de áreas para mapas offline.
+  if (isMapTile(url)) return;
 
-          const fallback = await caches.match('./index.html');
-          if (fallback) return fallback;
-
-          return Response.error();
-        })
-    );
+  // Recursos de Leaflet: caché de ejecución para que el mapa pueda inicializar si ya se cargaron antes.
+  if (url.hostname === 'unpkg.com') {
+    event.respondWith((async () => {
+      const cache = await caches.open(RUNTIME_CACHE);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response.ok && (request.destination === 'script' || request.destination === 'style')) {
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        return new Response('Recurso no disponible sin conexión.', {
+          status: 503,
+          statusText: 'Offline',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      }
+    })());
     return;
   }
 
-  // Recursos externos y otros archivos:
-  // red primero, caché como alternativa.
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response && response.ok && response.type !== 'opaque') {
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE)
-            .then((cache) => cache.put(request, copy))
-            .catch(() => {});
+  if (url.origin !== self.location.origin) return;
+
+  // Navegación: primero red para recibir actualizaciones; si falla, usa la app guardada.
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(APP_CACHE);
+          await cache.put('./index.html', response.clone());
         }
         return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
+      } catch (_) {
+        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Archivos estáticos propios: cache-first, con actualización en segundo plano si la red está disponible.
+  if (['style', 'script', 'image', 'font', 'manifest'].includes(request.destination) ||
+      /\/(manifest\.json|index\.html)$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(APP_CACHE);
+      const cached = await cache.match(request);
+      if (cached) {
+        fetch(request).then(response => {
+          if (response.ok) cache.put(request, response.clone()).catch(() => {});
+        }).catch(() => {});
+        return cached;
+      }
+      try {
+        const response = await fetch(request);
+        if (response.ok) await cache.put(request, response.clone());
+        return response;
+      } catch (_) {
         return Response.error();
-      })
-  );
+      }
+    })());
+  }
 });
