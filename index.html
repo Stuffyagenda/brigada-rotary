@@ -1841,8 +1841,11 @@
 
     window.loadReportToForm = async (id) => {
       const all = await StorageService.getAllReports();
-      const report = all.find(item => item.id === id);
-      if (!report) return;
+      const report = all.find(item => String(item.id) === String(id));
+      if (!report) {
+        alert('No se encontró el registro. Pulsa “Actualizar” en Mis registros e inténtalo de nuevo.');
+        return false;
+      }
 
       const panel = document.getElementById('sidebarPanel');
       panel.classList.remove('collapsed');
@@ -1924,8 +1927,12 @@
       document.getElementById('checkHasNeeds').checked = hasNeeds;
 
       handleStatusChange();
-      map.setView([report.lat, report.lng], 16);
-      setLocationInForm(report.lat, report.lng);
+      if (map && Number.isFinite(Number(report.lat)) && Number.isFinite(Number(report.lng))) {
+        map.setView([Number(report.lat), Number(report.lng)], 16);
+        setLocationInForm(Number(report.lat), Number(report.lng));
+        setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+      }
+      return true;
     };
 
     function resetFormToDefaults() {
@@ -2066,6 +2073,32 @@
         syncStatus: 'PENDING'
       };
 
+      // Confirmar antes de sobrescribir un registro existente.
+      const existingReport = existingId !== ''
+        ? (await StorageService.getAllReports()).find(item => String(item.id) === String(existingId))
+        : null;
+      let confirmationMessage = '¿Estás seguro de que deseas guardar este nuevo reporte?';
+      if (existingReport) {
+        const locationChanged = Math.abs(Number(existingReport.lat) - reportData.lat) > 0.0000001 ||
+                                Math.abs(Number(existingReport.lng) - reportData.lng) > 0.0000001;
+        const ignoredKeys = new Set(['id', 'createdAt', 'updatedAt', 'syncStatus', 'lat', 'lng', 'plusCode']);
+        const formChanged = Object.keys(reportData).some(key => {
+          if (ignoredKeys.has(key)) return false;
+          return JSON.stringify(reportData[key] ?? null) !== JSON.stringify(existingReport[key] ?? null);
+        }) || String(existingReport.plusCode || '') !== String(reportData.plusCode || '');
+
+        if (locationChanged && formChanged) {
+          confirmationMessage = '¿Estás seguro de cambiar la ubicación y realizar también los cambios del formulario?';
+        } else if (locationChanged) {
+          confirmationMessage = '¿Estás seguro de cambiar la ubicación de este registro?';
+        } else if (formChanged) {
+          confirmationMessage = '¿Estás seguro de realizar los cambios del formulario?';
+        } else {
+          confirmationMessage = 'No se detectaron cambios en los datos. ¿Deseas guardar de todos modos?';
+        }
+      }
+      if (!window.confirm(confirmationMessage)) return;
+
       await StorageService.saveReport(reportData);
       resetFormToDefaults();
       await refreshMapAndBadges();
@@ -2125,22 +2158,44 @@
       }).join('');
     };
     window.editRecordLocation = async (id) => {
-      closeRecords();
-      await window.loadReportToForm(id);
-      alert('Se cargó el registro existente. Para corregir la ubicación, toca el punto correcto en el mapa o usa “Mi Ubicación” y luego pulsa “Guardar Reporte”. Se actualizará el mismo registro.');
+      try {
+        const loaded = await window.loadReportToForm(id);
+        if (!loaded) return;
+        closeRecords();
+        const panel = document.getElementById('sidebarPanel');
+        if (panel && window.innerWidth <= 900) panel.classList.remove('collapsed');
+        if (map) setTimeout(() => map.invalidateSize(), 200);
+        alert('Registro cargado para editar. Modifica los campos que necesites. Para cambiar la ubicación, toca el punto correcto en el mapa o usa “Mi Ubicación”. Al guardar, te pediremos confirmar los cambios.');
+      } catch (err) {
+        console.error('No se pudo cargar el registro para editar:', err);
+        alert('No se pudo abrir este registro para editar. Pulsa “Actualizar” e inténtalo nuevamente.');
+      }
     };
     window.showRecordOnMap = async (id) => {
-      const reports = await StorageService.getAllReports();
-      const r = reports.find(item => String(item.id) === String(id));
-      if (!r) return;
-      const lat = Number(r.lat), lng = Number(r.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180) { alert('Este registro no tiene coordenadas válidas. Usa Editar registro para corregirlas.'); return; }
-      closeRecords();
-      if (map) { map.setView([lat,lng], 17); }
-      const panel = document.getElementById('sidebarPanel');
-      if (window.innerWidth <= 900 && panel) panel.classList.add('collapsed');
-      setTimeout(() => { if (map) map.invalidateSize(); }, 250);
-      await refreshMapAndBadges();
+      try {
+        const reports = await StorageService.getAllReports();
+        const r = reports.find(item => String(item.id) === String(id));
+        if (!r) { alert('No se encontró el registro. Pulsa “Actualizar” e inténtalo de nuevo.'); return; }
+        const lat = Number(r.lat), lng = Number(r.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180) {
+          alert('Este registro no tiene coordenadas válidas. Usa “Editar registro / ubicación” para corregirlas.');
+          return;
+        }
+        closeRecords();
+        const panel = document.getElementById('sidebarPanel');
+        if (window.innerWidth <= 900 && panel) panel.classList.add('collapsed');
+        if (map) {
+          map.setView([lat, lng], 17, { animate: true });
+          setTimeout(() => { if (map) map.invalidateSize(); }, 250);
+        } else {
+          alert('El mapa todavía se está cargando. Espera un momento e inténtalo de nuevo.');
+          return;
+        }
+        await refreshMapAndBadges();
+      } catch (err) {
+        console.error('No se pudo mostrar el registro en el mapa:', err);
+        alert('No se pudo mostrar la ubicación en el mapa. Inténtalo de nuevo.');
+      }
     };
 
     // Instalación PWA compatible con el diálogo nativo de Android/Chrome.
