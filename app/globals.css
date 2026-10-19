@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Archivos fuera de la app Next: Tailwind no debe escanearlos. */
+@source not "../index.html";
+@source not "../sw.js";
+@source not "../supabase";
+@source not "../**/*.test.{ts,tsx}";
+@source not "../e2e";
+@source not "../*.md";
+
+/* Hover solo en dispositivos con puntero fino (nunca en táctiles). */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
+/* =====================================================================
+   Tokens de diseño: "ficha de triaje". Solo tema claro.
+   `static`: todas las variables se emiten aunque no se usen como utilidad,
+   para poder usarlas con var(--...) en CSS propio.
+   ===================================================================== */
+@theme static {
+  /* Se eliminan las paletas por defecto: solo existen estos colores. */
+  --color-*: initial;
+  --color-ink: #1c2733; /* texto y trazos */
+  --color-ink-soft: #4b5a69; /* texto secundario (contraste AA sobre paper y white) */
+  --color-paper: #f4f6f8; /* superficie del panel */
+  --color-white: #ffffff;
+  --color-rotary: #17458f; /* acción primaria */
+  --color-rotary-strong: #10336b; /* hover / pulsado de la acción primaria */
+  --color-gold: #f7a81b; /* solo foco y selección activa */
+  --color-pending: #c4122f; /* estado PENDIENTE */
+  --color-pending-tint: #fbe8eb;
+  --color-done: #0e7c47; /* estado ATENDIDO */
+  --color-done-tint: #e4f3eb;
+  --color-line: #d5dce3; /* divisores */
+
+  /* Tipografía: base 17 px, escala 1.25 (13.6 / 17 / 21.25 / 26.5 / 33). */
+  --text-*: initial;
+  --text-sm: 0.85rem;
+  --text-sm--line-height: 1.4;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.45;
+  --text-lg: 1.328rem;
+  --text-lg--line-height: 1.3;
+  --text-xl: 1.656rem;
+  --text-xl--line-height: 1.2;
+  --text-2xl: 2.0625rem;
+  --text-2xl--line-height: 1.1;
+
+  /* Curvas de movimiento */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Fuentes (variables definidas por next/font en app/layout.tsx). */
+@theme inline {
+  --font-sans: var(--font-atkinson), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Solo para el sello de estado y los conteos grandes. */
+  --font-stamp: var(--font-barlow), "Arial Narrow", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Duraciones */
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  [role="button"],
+  [role="radio"],
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+  }
+
+  input[type="number"],
+  output,
+  data {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Foco visible: anillo gold en todos los elementos interactivos. */
+  :focus-visible {
+    outline: 3px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* Sello de estado / conteos grandes. */
+@utility font-stamp {
+  font-family: var(--font-stamp);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* Movimiento reducido: sin transformaciones animadas; se mantienen opacidad y color. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-property: opacity, color, background-color, border-color, outline-color, fill, stroke !important;
+    scroll-behavior: auto !important;
+  }
+}
