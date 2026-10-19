@@ -25,6 +25,9 @@ function esPerfilCache(value: unknown): value is PerfilCache {
     !!v.profile &&
     typeof v.profile === "object" &&
     v.profile.id === v.userId &&
+    (v.profile.estado_aprobacion === "pendiente" ||
+      v.profile.estado_aprobacion === "aprobado" ||
+      v.profile.estado_aprobacion === "rechazado") &&
     typeof v.savedAt === "string"
   );
 }

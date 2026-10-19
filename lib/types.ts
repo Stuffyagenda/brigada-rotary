@@ -30,6 +30,9 @@ export type DanioVivienda = (typeof DANIOS_VIVIENDA)[number];
 export const ROLES = ["admin", "miembro"] as const;
 export type Rol = (typeof ROLES)[number];
 
+export const ESTADOS_APROBACION = ["pendiente", "aprobado", "rechazado"] as const;
+export type EstadoAprobacion = (typeof ESTADOS_APROBACION)[number];
+
 export const TIPOS_CLUB = ["rotary", "rotaract"] as const;
 export type TipoClub = (typeof TIPOS_CLUB)[number];
 
@@ -65,7 +68,10 @@ export type ReporteUpsert = Omit<Reporte, "total_personas" | "created_by" | "upd
  * registro; en los perfiles anteriores `nombre` tiene el nombre completo y
  * `apellido` es null. `nombre_completo` sigue siendo el nombre visible.
  */
-export type Profile = Omit<Tables<"profiles">, "rol"> & { rol: Rol };
+export type Profile = Omit<Tables<"profiles">, "rol" | "estado_aprobacion"> & {
+  rol: Rol;
+  estado_aprobacion: EstadoAprobacion;
+};
 export type Club = Omit<Tables<"clubs">, "tipo"> & { tipo: TipoClub };
 
 /** Club tal como lo devuelve `rpc('clubs_publicos')` (accesible sin sesión, para el registro). */

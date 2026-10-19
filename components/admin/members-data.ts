@@ -7,9 +7,9 @@
 import { isNetworkError } from "@/lib/auth/errors";
 import { nombreCompletoDe } from "@/lib/auth/nombre";
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
-import { ROL_LABEL, type Club, type Rol } from "@/lib/types";
+import { ROL_LABEL, type Club, type EstadoAprobacion, type Rol } from "@/lib/types";
 
-/** Columnas de `profiles` que muestra la página (el email vive en auth.users y no es accesible). */
+/** El correo llega únicamente por la RPC restringida `admin_miembros()`. */
 export interface Miembro {
   id: string;
   nombre: string | null;
@@ -19,17 +19,20 @@ export interface Miembro {
   club_id: string | null;
   rol: Rol;
   activo: boolean;
+  estado_aprobacion: EstadoAprobacion;
+  email: string | null;
+  email_confirmado: boolean;
 }
 
 /**
  * Cambio que hace el admin. `nombre` y `apellido` van juntos (diálogo de datos);
  * `nombre_completo` nunca se envía: lo recalcula `protect_profile_fields`.
  */
-export type MiembroCambio = Partial<Pick<Miembro, "club_id" | "rol" | "activo" | "nombre" | "apellido">>;
+export type MiembroCambio = Partial<Pick<Miembro, "club_id" | "rol" | "activo" | "estado_aprobacion" | "nombre" | "apellido">>;
 
 export type ClubOpcion = Pick<Club, "id" | "nombre" | "tipo">;
 
-const COLUMNAS = "id, nombre, apellido, nombre_completo, club_id, rol, activo";
+const COLUMNAS = "id, nombre, apellido, nombre_completo, club_id, rol, activo, estado_aprobacion";
 
 export const MSG_ADMIN_SIN_RED = "Sin conexión. Necesitas internet para administrar miembros.";
 
@@ -66,7 +69,7 @@ export async function cargarMiembros(
   supabase: TypedSupabaseClient,
 ): Promise<{ miembros: Miembro[]; clubs: ClubOpcion[] }> {
   const [perfiles, clubs] = await Promise.all([
-    supabase.from("profiles").select(COLUMNAS),
+    supabase.rpc("admin_miembros"),
     supabase.from("clubs").select("id, nombre, tipo").order("nombre"),
   ]);
   if (perfiles.error) throw perfiles.error;
@@ -83,13 +86,13 @@ export async function cargarMiembros(
  */
 export async function actualizarMiembro(
   supabase: TypedSupabaseClient,
-  id: string,
+  miembro: Miembro,
   cambio: MiembroCambio,
 ): Promise<Miembro> {
-  const { data, error } = await supabase.from("profiles").update(cambio).eq("id", id).select(COLUMNAS).maybeSingle();
+  const { data, error } = await supabase.from("profiles").update(cambio).eq("id", miembro.id).select(COLUMNAS).maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Solo un administrador activo puede hacer este cambio.");
-  return data as Miembro;
+  return { ...miembro, ...data } as Miembro;
 }
 
 /**
@@ -124,6 +127,20 @@ export function confirmacionNecesaria(
   cambio: MiembroCambio,
 ): { title: string; description: string; confirmLabel: string } | null {
   const nombre = nombreVisible(miembro);
+  if (cambio.estado_aprobacion === "aprobado" && miembro.estado_aprobacion !== "aprobado") {
+    return {
+      title: `¿Aprobar a ${nombre}?`,
+      description: "Podrá entrar y acceder a los datos de la brigada. Verifica su nombre, correo y club.",
+      confirmLabel: "Aprobar solicitud",
+    };
+  }
+  if (cambio.estado_aprobacion === "rechazado" && miembro.estado_aprobacion === "pendiente") {
+    return {
+      title: `¿Rechazar a ${nombre}?`,
+      description: "Conservaremos su solicitud como rechazada. No podrá acceder a los datos de la brigada.",
+      confirmLabel: "Rechazar solicitud",
+    };
+  }
   if (cambio.activo === false && miembro.activo) {
     return {
       title: `¿Desactivar a ${nombre}?`,
@@ -144,6 +161,8 @@ export function confirmacionNecesaria(
 /** Texto del aviso tras guardar. */
 export function avisoGuardado(miembro: Miembro, cambio: MiembroCambio, clubs: readonly ClubOpcion[]): string {
   const nombre = nombreVisible(miembro);
+  if (cambio.estado_aprobacion === "aprobado") return `Solicitud de ${nombre} aprobada.`;
+  if (cambio.estado_aprobacion === "rechazado") return `Solicitud de ${nombre} rechazada.`;
   if (cambio.activo !== undefined) {
     return cambio.activo ? `Acceso de ${nombre} activado.` : `Acceso de ${nombre} desactivado.`;
   }

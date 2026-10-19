@@ -129,7 +129,7 @@ describe("RegistroForm", () => {
     expect(replace).toHaveBeenCalledWith("/registros");
   });
 
-  it("sin sesión (confirmación de correo) muestra el aviso y el enlace a /login", async () => {
+  it("sin sesión (confirmación de correo) avisa de la revisión administrativa", async () => {
     signUp.mockResolvedValue({ data: { user, session: null }, error: null });
     render(<RegistroForm />);
     await llenar();
@@ -138,7 +138,7 @@ describe("RegistroForm", () => {
     const titulo = await screen.findByRole("heading", { name: "Revisa tu correo" });
     expect(titulo).toHaveFocus();
     expect(
-      screen.getByText("Te enviamos un correo para confirmar tu cuenta. Ábrelo y luego inicia sesión."),
+      screen.getByText("Te enviamos un correo para confirmar tu cuenta. Después de confirmarla, un administrador revisará tu solicitud antes de darte acceso."),
     ).toBeInTheDocument();
     expect(screen.getByText("ana@example.org")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ir a iniciar sesión" })).toHaveAttribute("href", "/login");

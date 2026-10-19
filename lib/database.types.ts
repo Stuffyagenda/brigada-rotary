@@ -51,6 +51,7 @@ export type Database = {
           apellido: string | null
           club_id: string | null
           created_at: string
+          estado_aprobacion: string
           id: string
           nombre: string | null
           nombre_completo: string | null
@@ -62,6 +63,7 @@ export type Database = {
           apellido?: string | null
           club_id?: string | null
           created_at?: string
+          estado_aprobacion?: string
           id: string
           nombre?: string | null
           nombre_completo?: string | null
@@ -73,6 +75,7 @@ export type Database = {
           apellido?: string | null
           club_id?: string | null
           created_at?: string
+          estado_aprobacion?: string
           id?: string
           nombre?: string | null
           nombre_completo?: string | null
@@ -330,6 +333,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_miembros: {
+        Args: never
+        Returns: {
+          id: string
+          nombre: string | null
+          apellido: string | null
+          nombre_completo: string | null
+          club_id: string | null
+          rol: string
+          activo: boolean
+          estado_aprobacion: string
+          email: string | null
+          email_confirmado: boolean
+        }[]
+      }
       clubs_publicos: {
         Args: never
         Returns: {

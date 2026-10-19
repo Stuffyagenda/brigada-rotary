@@ -74,10 +74,15 @@ function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 pt-2">
           <p className={cn("font-semibold break-words", sinNombre && "text-ink-soft")}>{nombre}</p>
           {esYo && <span className="text-sm text-ink-soft">(tú)</span>}
+          {miembro.estado_aprobacion === "rechazado" && (
+            <span className="text-sm font-semibold text-pending">Solicitud rechazada</span>
+          )}
           {!sinNombre && !miembro.apellido?.trim() && (
             <span className="text-sm text-ink-soft">Sin apellido</span>
           )}
-          {!miembro.activo && <span className="text-sm font-semibold text-pending">Sin acceso</span>}
+          {miembro.estado_aprobacion === "aprobado" && !miembro.activo && (
+            <span className="text-sm font-semibold text-pending">Sin acceso</span>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -90,6 +95,10 @@ function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre
           <span aria-hidden="true">Editar nombre</span>
         </Button>
       </div>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+        <span className="break-all">{miembro.email ?? "Sin correo"}</span>
+        <span>{miembro.email_confirmado ? "Correo confirmado" : "Correo sin confirmar"}</span>
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
         <div className="flex flex-col gap-1">
           <label htmlFor={`${id}-club`} className="text-sm text-ink-soft">
@@ -98,7 +107,7 @@ function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre
           <select
             id={`${id}-club`}
             value={miembro.club_id ?? ""}
-            disabled={guardando}
+            disabled={guardando || miembro.estado_aprobacion !== "aprobado"}
             onChange={(e) => onCambio(miembro, { club_id: e.target.value || null })}
             className={selectClass}
           >
@@ -119,7 +128,7 @@ function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre
           <select
             id={`${id}-rol`}
             value={miembro.rol}
-            disabled={guardando}
+            disabled={guardando || miembro.estado_aprobacion !== "aprobado"}
             onChange={(e) => onCambio(miembro, { rol: e.target.value as Rol })}
             className={selectClass}
           >
@@ -130,13 +139,30 @@ function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre
             ))}
           </select>
         </div>
-        <Switch
-          checked={miembro.activo}
-          disabled={guardando}
-          label={`Acceso de ${nombre}`}
-          onChange={(activo) => onCambio(miembro, { activo })}
-        />
+        {miembro.estado_aprobacion === "aprobado" && (
+          <Switch
+            checked={miembro.activo}
+            disabled={guardando}
+            label={`Acceso de ${nombre}`}
+            onChange={(activo) => onCambio(miembro, { activo })}
+          />
+        )}
       </div>
+      {miembro.estado_aprobacion !== "aprobado" && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            disabled={guardando}
+            onClick={() => onCambio(miembro, { estado_aprobacion: "aprobado", activo: true })}
+          >
+            {miembro.estado_aprobacion === "rechazado" ? "Aprobar ahora" : "Aprobar"}
+          </Button>
+          {miembro.estado_aprobacion === "pendiente" && (
+            <Button variant="secondary" disabled={guardando} onClick={() => onCambio(miembro, { estado_aprobacion: "rechazado", activo: false })}>
+              Rechazar
+            </Button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -191,7 +217,7 @@ export function MembersAdmin() {
       // Optimista: se muestra el cambio y se revierte si falla.
       reemplazar({ ...miembro, ...cambio });
       try {
-        const fila = await actualizarMiembro(getSupabaseBrowserClient(), miembro.id, cambio);
+        const fila = await actualizarMiembro(getSupabaseBrowserClient(), miembro, cambio);
         reemplazar(fila);
         toast.success(avisoGuardado(fila, cambio, clubs));
         if (fila.id === selfId) void refreshProfile();
@@ -214,7 +240,7 @@ export function MembersAdmin() {
     async (miembro: Miembro, cambio: Pick<MiembroCambio, "nombre" | "apellido">, clubs: readonly ClubOpcion[]) => {
       let fila: Miembro;
       try {
-        fila = await actualizarMiembro(getSupabaseBrowserClient(), miembro.id, cambio);
+        fila = await actualizarMiembro(getSupabaseBrowserClient(), miembro, cambio);
       } catch (error) {
         throw new Error(adminErrorMessage(error));
       }
@@ -267,6 +293,30 @@ export function MembersAdmin() {
   }
 
   const total = carga.estado === "listo" ? carga.miembros.length : null;
+  const pendientes = carga.estado === "listo" ? carga.miembros.filter((m) => m.estado_aprobacion === "pendiente") : [];
+  const rechazados = carga.estado === "listo" ? carga.miembros.filter((m) => m.estado_aprobacion === "rechazado") : [];
+  const aprobados = carga.estado === "listo" ? carga.miembros.filter((m) => m.estado_aprobacion === "aprobado") : [];
+
+  function listaMiembros(miembros: Miembro[], etiqueta: string) {
+    return (
+      <ul aria-label={etiqueta} className="divide-y divide-line border-t border-line">
+        {miembros.map((m) => (
+          <FilaMiembro
+            key={m.id}
+            miembro={m}
+            clubs={carga.estado === "listo" ? carga.clubs : []}
+            esYo={m.id === selfId}
+            guardando={guardando.has(m.id)}
+            onCambio={(miembro, cambio) => onCambio(miembro, cambio, carga.estado === "listo" ? carga.clubs : [])}
+            onEditarNombre={(miembro) => {
+              setEditado(miembro);
+              setEditandoNombre(true);
+            }}
+          />
+        ))}
+      </ul>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pt-4 pb-12">
@@ -285,8 +335,8 @@ export function MembersAdmin() {
       <p className="mb-2 flex gap-2 rounded-lg bg-white px-3 py-2.5 text-sm text-ink-soft ring-1 ring-line">
         <Info aria-hidden="true" size={18} className="mt-px shrink-0" />
         <span>
-          Cada persona crea su cuenta en la pantalla de registro y entra con acceso activo. Aquí puedes corregir su
-          nombre, cambiar su club o su rol, o desactivar su acceso.
+          Las cuentas nuevas esperan aprobación. Verifica nombre, correo y club antes de admitirlas;
+          las solicitudes rechazadas se conservan y pueden aprobarse más adelante.
         </span>
       </p>
 
@@ -310,22 +360,22 @@ export function MembersAdmin() {
         (carga.miembros.length === 0 ? (
           <p className="py-8 text-ink-soft">Todavía no hay miembros.</p>
         ) : (
-          <ul aria-label="Lista de miembros" className="divide-y divide-line border-t border-line">
-            {carga.miembros.map((m) => (
-              <FilaMiembro
-                key={m.id}
-                miembro={m}
-                clubs={carga.clubs}
-                esYo={m.id === selfId}
-                guardando={guardando.has(m.id)}
-                onCambio={(miembro, cambio) => onCambio(miembro, cambio, carga.clubs)}
-                onEditarNombre={(miembro) => {
-                  setEditado(miembro);
-                  setEditandoNombre(true);
-                }}
-              />
-            ))}
-          </ul>
+          <div className="flex flex-col gap-8">
+            <section aria-labelledby="pendientes-titulo">
+              <h2 id="pendientes-titulo" className="mb-2 text-lg font-bold">Solicitudes pendientes ({pendientes.length})</h2>
+              {pendientes.length ? listaMiembros(pendientes, "Solicitudes pendientes") : <p className="text-ink-soft">No hay solicitudes pendientes.</p>}
+            </section>
+            {rechazados.length > 0 && (
+              <section aria-labelledby="rechazados-titulo">
+                <h2 id="rechazados-titulo" className="mb-2 text-lg font-bold">Solicitudes rechazadas ({rechazados.length})</h2>
+                {listaMiembros(rechazados, "Solicitudes rechazadas")}
+              </section>
+            )}
+            <section aria-labelledby="aprobados-titulo">
+              <h2 id="aprobados-titulo" className="mb-2 text-lg font-bold">Miembros aprobados ({aprobados.length})</h2>
+              {listaMiembros(aprobados, "Lista de miembros")}
+            </section>
+          </div>
         ))}
 
       <ConfirmDialog

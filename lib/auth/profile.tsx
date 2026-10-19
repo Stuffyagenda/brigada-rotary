@@ -83,7 +83,7 @@ const ProfileContext = createContext<ProfileContextValue>({
 
 /** `true` si el perfil es de un admin activo. */
 export function esAdminActivo(profile: Profile | null): boolean {
-  return Boolean(profile?.activo && profile.rol === "admin");
+  return Boolean(profile?.activo && profile.estado_aprobacion === "aprobado" && profile.rol === "admin");
 }
 
 async function fetchProfile(

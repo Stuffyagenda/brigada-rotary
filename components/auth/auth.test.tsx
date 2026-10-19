@@ -54,6 +54,7 @@ const profile: Profile = {
   club_id: "c1",
   rol: "admin",
   activo: true,
+  estado_aprobacion: "aprobado",
   created_at: "x",
   updated_at: "x",
 };
@@ -166,11 +167,13 @@ describe("gateView", () => {
     expect(gateView({ ...base, status: "signed-out" })).toBe("redirect");
     expect(gateView({ ...base, status: "signed-in" })).toBe("app");
     expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false } })).toBe("inactive");
+    expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false, estado_aprobacion: "pendiente" } })).toBe("pending");
+    expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false, estado_aprobacion: "rechazado" } })).toBe("rejected");
     expect(gateView({ ...base, status: "loading", profile: null })).toBe("loading");
     expect(gateView({ ...base, status: "loading" })).toBe("app");
     expect(gateView({ ...base, status: "signed-in", profile: null })).toBe("no-profile");
-    // Sin red y sin perfil en caché: se deja pasar.
-    expect(gateView({ status: "signed-in", profile: null, offline: true })).toBe("app");
+    // Sin perfil verificado, incluso sin red no se puede entrar.
+    expect(gateView({ status: "signed-in", profile: null, offline: true })).toBe("loading");
   });
 });
 
@@ -196,6 +199,17 @@ describe("SessionGate", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cerrar sesión" }));
     expect(signOut).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("distingue las solicitudes pendientes y rechazadas", () => {
+    perfilActual = perfil({ profile: { ...profile, activo: false, estado_aprobacion: "pendiente" } });
+    const { unmount } = render(<SessionGate>contenido</SessionGate>);
+    expect(screen.getByText("Tu solicitud está pendiente de aprobación.")).toBeInTheDocument();
+    expect(screen.queryByText("contenido")).not.toBeInTheDocument();
+    unmount();
+    perfilActual = perfil({ profile: { ...profile, activo: false, estado_aprobacion: "rechazado" } });
+    render(<SessionGate>contenido</SessionGate>);
+    expect(screen.getByText("Tu solicitud fue rechazada.")).toBeInTheDocument();
   });
 });
 
