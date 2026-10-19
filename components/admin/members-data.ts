@@ -134,7 +134,7 @@ export function confirmacionNecesaria(
   if (cambio.rol === "miembro" && miembro.rol === "admin") {
     return {
       title: `¿Quitar el rol de administrador a ${nombre}?`,
-      description: "Dejará de poder borrar reportes y de administrar miembros.",
+      description: "Dejará de poder administrar miembros.",
       confirmLabel: "Quitar rol",
     };
   }

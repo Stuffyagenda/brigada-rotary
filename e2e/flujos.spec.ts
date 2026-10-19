@@ -136,35 +136,29 @@ test.describe("sin conexión", () => {
   });
 });
 
-test.describe("borrar reportes", () => {
+test.describe("sin borrado de reportes", () => {
   test.beforeEach(() => {
     test.skip(!hayCredenciales, MOTIVO_CREDENCIALES);
   });
 
-  test('el miembro no ve "Mantén pulsado para borrar" y el admin sí', async ({ page }) => {
+  // Los reportes y las visitas no se borran, ni siquiera un admin. No hay limpieza
+  // por borrado: los datos de prueba (nombres ficticios únicos) quedan en el
+  // Supabase local.
+  test("ni el miembro ni el admin ven una acción de borrar en la ficha", async ({ page }) => {
+    const accionBorrar = (p: typeof page) => p.getByRole("button", { name: /borrar|eliminar|mantén pulsado/i });
+
     await iniciarSesion(page, MIEMBRO);
     await esperarMapa(page);
-    const id = await registrarFamilia(page, nombreFicticio("borrar"));
+    const id = await registrarFamilia(page, nombreFicticio("sin-borrado"));
     await expect(page.getByRole("dialog", { name: "Ficha de la familia" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Mantén pulsado/ })).toHaveCount(0);
+    await expect(accionBorrar(page)).toHaveCount(0);
     await cerrarSesion(page);
 
     await iniciarSesion(page, ADMIN);
     await esperarMapa(page);
     await page.goto(`/?reporte=${id}`);
-    const borrar = page.getByRole("button", { name: "Mantén pulsado 2 segundos para borrar" });
-    await expect(borrar).toHaveCount(1);
-
-    // Limpieza: el admin borra el reporte de prueba (mantener pulsado 2 s).
-    await borrar.scrollIntoViewIfNeeded();
-    const caja = await borrar.boundingBox();
-    if (caja) {
-      await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
-      await page.mouse.down();
-      await page.waitForTimeout(2_400);
-      await page.mouse.up();
-      await expect(borrar).toHaveCount(0, { timeout: 10_000 });
-    }
+    await expect(page.getByRole("dialog", { name: "Ficha de la familia" })).toBeVisible();
+    await expect(accionBorrar(page)).toHaveCount(0);
   });
 });
 

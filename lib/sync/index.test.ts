@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, type ReporteLocal } from "@/lib/db";
 import { META_ULTIMO_BRIGADISTA } from "@/lib/brigadista";
-import { clasificarError, conStatus, MSG_BORRAR_SIN_RED, MSG_BORRAR_SOLO_ADMIN, MSG_SESION } from "@/lib/sync/errors";
+import { clasificarError, conStatus, MSG_SESION } from "@/lib/sync/errors";
 import { limpiarCacheFotos } from "@/lib/sync/foto";
 import type { OutboxEntrySync } from "@/lib/sync/outbox";
 import { reconciliar } from "@/lib/sync/pull";
@@ -10,9 +10,8 @@ import { getEngineState, resetEngineState } from "@/lib/sync/state";
 import { createFakeSupabase, errorRed, filaRemota } from "@/lib/sync/testing/fake-supabase";
 import { uuid } from "@/lib/sync/uuid";
 import { reporteVacio, type Reporte } from "@/lib/types";
-import { ejecutarSync, esperarSync } from "@/lib/sync/engine";
+import { ejecutarSync } from "@/lib/sync/engine";
 import {
-  deleteReport,
   getFotoPendiente,
   getFotoUrl,
   limpiarEspejoLocal,
@@ -21,7 +20,7 @@ import {
   saveVisita,
   syncNow,
 } from "@/lib/sync";
-import { BrigadaDB, type OutboxEntry, type VisitaLocal } from "@/lib/db";
+import { BrigadaDB, type OutboxEntry } from "@/lib/db";
 import Dexie from "dexie";
 import { visitaVacia } from "@/lib/types";
 import { fechaPanama, hoyPanama } from "@/lib/vigencia";
@@ -357,68 +356,21 @@ describe("pull y reconciliación", () => {
   });
 });
 
-describe("deleteReport", () => {
-  it("sin red lanza un error claro", async () => {
-    setOnline(false);
-    await expect(deleteReport(ID_A)).rejects.toThrow(MSG_BORRAR_SIN_RED);
-  });
-
-  it("si el servidor no borra ninguna fila avisa que solo un admin puede", async () => {
+describe("entradas de borrado heredadas", () => {
+  it("una entrada antigua op:'delete' se descarta de la cola sin llamar a delete() del cliente", async () => {
+    // Los reportes ya no se borran; un celular puede conservar una entrada de una versión anterior.
     fake.state.rows.set(ID_A, filaRemota({ id: ID_A }));
-    fake.state.deleteBloqueado = true;
-    await db.reportes.put(local(ID_A));
-    await expect(deleteReport(ID_A)).rejects.toThrow(MSG_BORRAR_SOLO_ADMIN);
-    expect(await db.reportes.get(ID_A)).toBeDefined();
-  });
-
-  it("con un upsert pendiente, el borrado es exclusivo: el upsert no se envía después del DELETE", async () => {
-    fake.state.rows.set(ID_A, filaRemota({ id: ID_A }));
-    setOnline(false);
-    await saveReport({ ...reporteVacio(7.96, -80.43), id: ID_A, adultos: 3 });
-    expect(await db.outbox.count()).toBe(1);
-    setOnline(true);
-
-    // Un disparador (60 s / online / visibilitychange) llega con el DELETE ya
-    // aplicado en el servidor y la respuesta aún en camino.
-    let pasada: Promise<unknown> | undefined;
-    fake.state.despuesDeBorrar = async () => {
-      fake.state.despuesDeBorrar = null;
-      pasada = ejecutarSync(false);
-      await new Promise((r) => setTimeout(r, 30));
-    };
-    await deleteReport(ID_A);
-    await pasada;
-    await esperarSync();
-
-    const iDelete = fake.state.calls.indexOf(`delete:${ID_A}`);
-    expect(iDelete).toBeGreaterThanOrEqual(0);
-    expect(fake.state.calls.slice(iDelete)).not.toContain(`upsert:${ID_A}`);
-    expect(fake.state.rows.has(ID_A)).toBe(false);
-    expect(await db.reportes.get(ID_A)).toBeUndefined();
+    await db.outbox.add({
+      reporteId: ID_A,
+      op: "delete",
+      payload: null,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    } as unknown as OutboxEntry);
+    await syncNow();
     expect(await db.outbox.count()).toBe(0);
-  });
-
-  it("si el DELETE falla, devuelve a la cola los cambios pendientes", async () => {
-    fake.state.rows.set(ID_A, filaRemota({ id: ID_A }));
-    setOnline(false);
-    await saveReport({ ...reporteVacio(7.96, -80.43), id: ID_A, adultos: 3 });
-    setOnline(true);
-    fake.state.deleteError = { message: "permission denied for table reportes", code: "42501", status: 403 };
-    await expect(deleteReport(ID_A)).rejects.toThrow("No se pudo borrar el reporte");
-    const [e] = await entradas();
-    expect(e).toMatchObject({ reporteId: ID_A, op: "upsert" });
-    expect(e.payload?.adultos).toBe(3);
-    expect(await db.reportes.get(ID_A)).toBeDefined();
-  });
-
-  it("borra en el servidor, en Dexie, en la cola y la foto", async () => {
-    fake.state.rows.set(ID_A, filaRemota({ id: ID_A, foto_path: `${ID_A}/f.jpg` }));
-    await db.reportes.put(local(ID_A, { foto_path: `${ID_A}/f.jpg` }));
-    await deleteReport(ID_A);
-    expect(fake.state.rows.has(ID_A)).toBe(false);
-    expect(await db.reportes.get(ID_A)).toBeUndefined();
-    expect(await db.outbox.where("reporteId").equals(ID_A).count()).toBe(0);
-    expect(fake.state.removed).toEqual([`${ID_A}/f.jpg`]);
+    expect(fake.state.calls.some((c) => c.includes("delete"))).toBe(false);
+    expect(fake.state.rows.has(ID_A)).toBe(true);
   });
 });
 
@@ -664,26 +616,5 @@ describe("outbox con entradas de visita", () => {
     await saveReport({ ...reporteVacio(7.96, -80.43), id: ID_A });
     const cola = await entradas();
     expect(cola.map((e) => e.entidad ?? "reporte")).toEqual(["visita", "reporte"]);
-  });
-
-  it("deleteReport borra también las visitas locales y sus entradas", async () => {
-    fake.state.rows.set(ID_A, filaRemota({ id: ID_A }));
-    await db.reportes.put(local(ID_A));
-    const visita: VisitaLocal = {
-      ...visitaVacia(ID_A),
-      id: ID_D,
-      ent_agua: true,
-      visitado_at: new Date().toISOString(),
-      brigadista_texto: null,
-      observaciones: null,
-      created_at: new Date().toISOString(),
-      created_by: null,
-      _sync: "synced",
-    };
-    await db.visitas.put(visita);
-    await db.outbox.add(entradaVisita(ID_A) as OutboxEntry);
-    await deleteReport(ID_A);
-    expect(await db.visitas.count()).toBe(0);
-    expect(await db.outbox.count()).toBe(0);
   });
 });

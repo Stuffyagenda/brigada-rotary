@@ -61,17 +61,8 @@ export interface FakeState {
    * (se consumen). Permite rechazar una fila concreta y dejar pasar las demás.
    */
   upsertErrorPorId: Map<string, FakeError>;
-  /** Error a devolver en el próximo delete (se consume). */
-  deleteError: FakeError | null;
-  /**
-   * Se espera después de ejecutar un delete y antes de responder (simula que algo
-   * pasa en el celular mientras la respuesta del DELETE viene en camino).
-   */
-  despuesDeBorrar: (() => Promise<void> | void) | null;
   /** Error a devolver en la próxima subida (se consume). */
   uploadError: FakeError | null;
-  /** Si es `true`, el delete no borra nada (simula la RLS de un miembro). */
-  deleteBloqueado: boolean;
   upsertBodies: Record<string, unknown>[];
   /** Cuerpos enviados en los upserts de `visitas`. */
   visitaBodies: Record<string, unknown>[];
@@ -181,12 +172,6 @@ class Query implements PromiseLike<Resultado> {
     if (this.op === "delete") {
       const id = String(this.filtros.find(([c]) => c === "id")?.[1]);
       s.calls.push(`delete:${id}`);
-      if (s.deleteError) {
-        const error = s.deleteError;
-        s.deleteError = null;
-        return respuestaError(error);
-      }
-      if (s.deleteBloqueado) return ok([]);
       const borradas = [...s.rows.values()].filter(coincide);
       for (const r of borradas) {
         s.rows.delete(r.id);
@@ -267,11 +252,7 @@ class Query implements PromiseLike<Resultado> {
     onrejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
   ): PromiseLike<A | B> {
     return Promise.resolve()
-      .then(async () => {
-        const r = this.ejecutar();
-        if (this.op === "delete" && this.state.despuesDeBorrar) await this.state.despuesDeBorrar();
-        return r;
-      })
+      .then(() => this.ejecutar())
       .then(onfulfilled, onrejected);
   }
 }
@@ -289,10 +270,7 @@ export function createFakeSupabase() {
     removed: [],
     upsertError: null,
     upsertErrorPorId: new Map(),
-    deleteError: null,
-    despuesDeBorrar: null,
     uploadError: null,
-    deleteBloqueado: false,
     upsertBodies: [],
     visitaBodies: [],
   };

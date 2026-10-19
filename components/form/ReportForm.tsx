@@ -93,7 +93,7 @@ export function ReportForm(props: ReportFormProps) {
     return (
       <Aviso onClose={props.onClose}>
         <p className="font-semibold text-ink">No se encontró el reporte.</p>
-        <p className="text-ink-soft">Puede que se haya borrado. Vuelve al mapa y ábrelo de nuevo.</p>
+        <p className="text-ink-soft">Puede que aún no se haya sincronizado. Vuelve al mapa y ábrelo de nuevo.</p>
       </Aviso>
     );
   }

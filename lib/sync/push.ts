@@ -123,7 +123,7 @@ async function enviarUpsert(client: TypedSupabaseClient, entry: OutboxEntrySync)
   const fila = data as unknown as Reporte;
   await db.transaction("rw", db.outbox, db.reportes, async () => {
     const actual = (await db.outbox.get(entry.seq)) as OutboxEntrySync | undefined;
-    if (!actual) return; // Se borró mientras tanto (p. ej. deleteReport).
+    if (!actual) return; // La entrada ya no está en la cola (la retiró otra operación).
     if ((actual.rev ?? 1) === (entry.rev ?? 1)) await db.outbox.delete(entry.seq);
     const quedan = await contarColaReporte(entry.reporteId);
     if (quedan === 0) {
@@ -131,13 +131,6 @@ async function enviarUpsert(client: TypedSupabaseClient, entry: OutboxEntrySync)
       await db.reportes.put(local);
     }
   });
-}
-
-/** Envía una entrada `delete` heredada (la app actual borra solo con red, sin encolar). */
-async function enviarDelete(client: TypedSupabaseClient, entry: OutboxEntrySync): Promise<void> {
-  const { error, status } = await client.from("reportes").delete().eq("id", entry.reporteId);
-  if (error) throw conStatus(error, status);
-  await db.outbox.delete(entry.seq);
 }
 
 /** Copia de la visita con solo las columnas que se envían (`created_by` lo fija el trigger). */
@@ -164,15 +157,8 @@ async function reporteAnteriorEnCola(entry: OutboxEntrySync): Promise<boolean> {
 /** Envía una entrada de visita. Lanza el error de Supabase si falla. */
 async function enviarVisita(client: TypedSupabaseClient, entry: OutboxEntrySync): Promise<void> {
   const visitaId = entry.visitaId;
-  if (!visitaId || (entry.op === "upsert" && !entry.visitaPayload)) {
+  if (!visitaId || !entry.visitaPayload) {
     // Entrada corrupta: no hay nada que enviar.
-    await db.outbox.delete(entry.seq);
-    return;
-  }
-
-  if (entry.op === "delete") {
-    const { error, status } = await client.from("visitas").delete().eq("id", visitaId);
-    if (error) throw conStatus(error, status);
     await db.outbox.delete(entry.seq);
     return;
   }
@@ -183,7 +169,7 @@ async function enviarVisita(client: TypedSupabaseClient, entry: OutboxEntrySync)
     .select()
     .single();
   if (error) {
-    // FK: el reporte no está en el servidor (p. ej. lo borró un admin). No se reintenta solo.
+    // FK: el reporte no está en el servidor (p. ej. el reporte no existe en el servidor). No se reintenta solo.
     if ((error as { code?: unknown }).code === "23503") throw new SyncError("fatal", MSG_VISITA_REPORTE_INEXISTENTE);
     throw conStatus(error, status);
   }
@@ -192,7 +178,7 @@ async function enviarVisita(client: TypedSupabaseClient, entry: OutboxEntrySync)
   const fila = data as unknown as Visita;
   await db.transaction("rw", db.outbox, db.visitas, async () => {
     const actual = (await db.outbox.get(entry.seq)) as OutboxEntrySync | undefined;
-    // Se borró (deleteReport) o se movió al final de la cola (nuevo guardado) mientras tanto.
+    // Se retiró de la cola o se movió al final de la cola (nuevo guardado) mientras tanto.
     if (!actual) return;
     if ((actual.rev ?? 1) === (entry.rev ?? 1)) await db.outbox.delete(entry.seq);
     if (await tieneColaVisita(entry.reporteId, visitaId)) return;
@@ -246,9 +232,14 @@ export async function pushOutbox(client: TypedSupabaseClient, force: boolean): P
     }
     // FK: la visita espera a que su reporte llegue al servidor.
     if (esVisita && (await reporteAnteriorEnCola(entry))) continue;
+    // Entradas `delete` heredadas de versiones anteriores: los reportes y las
+    // visitas ya no se borran. Se descartan de la cola sin enviar nada.
+    if ((entry.op as string) === "delete") {
+      await db.outbox.delete(entry.seq);
+      continue;
+    }
     try {
       if (esVisita) await enviarVisita(client, entry);
-      else if (entry.op === "delete") await enviarDelete(client, entry);
       else await enviarUpsert(client, entry);
       subidos += 1;
     } catch (err) {

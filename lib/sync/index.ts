@@ -14,19 +14,12 @@ import { useSyncExternalStore } from "react";
 import { META_ULTIMO_BRIGADISTA } from "@/lib/brigadista";
 import { db, type ReporteLocal, type VisitaLocal } from "@/lib/db";
 import { calcularAttendedAt } from "@/lib/report-rules";
-import type { TypedSupabaseClient } from "@/lib/supabase/client";
-import { BUCKET_FOTOS, getSyncClient, isOnline } from "@/lib/sync/client";
+import { getSyncClient, isOnline } from "@/lib/sync/client";
 import { ejecutarExclusivo, ejecutarSync } from "@/lib/sync/engine";
 import {
-  clasificarError,
-  conStatus,
   mensajeDe,
-  MSG_BORRAR_SIN_RED,
-  MSG_BORRAR_SOLO_ADMIN,
-  MSG_SESION,
-  MSG_SIN_CONFIG,
 } from "@/lib/sync/errors";
-import { limpiarCacheFotos, olvidarFoto } from "@/lib/sync/foto";
+import { limpiarCacheFotos } from "@/lib/sync/foto";
 import { contarColaReporte, encolarUpsert, encolarVisita, tieneColaVisita } from "@/lib/sync/outbox";
 import { rutaFotoNueva, uuid } from "@/lib/sync/uuid";
 import { getEngineState, META_LAST_SYNC, subscribeEngine } from "@/lib/sync/state";
@@ -351,90 +344,6 @@ function conTiempoLimite<T>(promesa: Promise<T>, ms: number): Promise<T | undefi
       },
     );
   });
-}
-
-/**
- * Borra un reporte en el servidor y en el celular (solo admin; la RLS lo impide
- * a los miembros). Requiere conexión: un borrado no se encola.
- *
- * Se ejecuta en exclusiva en la cola del motor: espera a la pasada en curso y
- * ninguna pasada corre mientras borra. Las entradas del outbox de ese reporte y
- * de sus visitas (que llevan el mismo `reporteId`) se retiran antes del DELETE
- * remoto (así ningún upsert pendiente puede "resucitarlo") y se restauran si el
- * borrado falla.
- *
- * Si el reporte solo existe en este celular (nunca llegó al servidor), se
- * descarta localmente. Sus visitas locales se borran con él (en el servidor,
- * por `on delete cascade`).
- * @throws Error "Necesitas conexión para borrar un reporte." sin señal.
- * @throws Error "No se pudo borrar: solo un administrador puede hacerlo." si la RLS lo impide.
- */
-export async function deleteReport(id: string): Promise<void> {
-  if (!isOnline()) throw new Error(MSG_BORRAR_SIN_RED);
-  const client = getSyncClient();
-  if (!client) throw new Error(MSG_SIN_CONFIG);
-
-  const fotoPath = await ejecutarExclusivo(async () => {
-    const retiradas = await db.transaction("rw", db.outbox, async () => {
-      const entradas = await db.outbox.where("reporteId").equals(id).toArray();
-      if (entradas.length) await db.outbox.bulkDelete(entradas.map((e) => e.seq));
-      return entradas;
-    });
-    try {
-      return await borrarEnServidor(client, id);
-    } catch (err) {
-      // El reporte sigue existiendo: sus cambios pendientes vuelven a la cola.
-      if (retiradas.length) await db.outbox.bulkPut(retiradas);
-      throw err;
-    }
-  });
-  olvidarFoto(id, fotoPath);
-
-  if (fotoPath) {
-    try {
-      await client.storage.from(BUCKET_FOTOS).remove([fotoPath]);
-    } catch {
-      // La foto huérfana no impide el borrado del reporte.
-    }
-  }
-}
-
-/** DELETE remoto y limpieza local. Devuelve la ruta de la foto, si la había. */
-async function borrarEnServidor(client: TypedSupabaseClient, id: string): Promise<string | null | undefined> {
-  const { data, error, status } = await client.from("reportes").delete().eq("id", id).select();
-  if (error) throw new Error(mensajeBorrado(conStatus(error, status)));
-
-  let fotoPath: string | null | undefined;
-  if (!data || data.length === 0) {
-    if (await existeEnServidor(client, id)) throw new Error(MSG_BORRAR_SOLO_ADMIN);
-    const local = await db.reportes.get(id);
-    if (!local) throw new Error(MSG_BORRAR_SOLO_ADMIN);
-    fotoPath = local.foto_path;
-  } else {
-    fotoPath = (data[0] as { foto_path?: string | null }).foto_path;
-  }
-
-  // En el servidor las visitas se borran en cascada; en el celular, aquí.
-  await db.transaction("rw", db.reportes, db.outbox, db.visitas, async () => {
-    await db.reportes.delete(id);
-    await db.visitas.where("reporte_id").equals(id).delete();
-    await db.outbox.where("reporteId").equals(id).delete();
-  });
-  return fotoPath;
-}
-
-function mensajeBorrado(error: unknown): string {
-  const kind = clasificarError(error);
-  if (kind === "auth") return MSG_SESION;
-  if (kind === "network") return MSG_BORRAR_SIN_RED;
-  return `No se pudo borrar el reporte: ${mensajeDe(error)}`;
-}
-
-async function existeEnServidor(client: TypedSupabaseClient, id: string): Promise<boolean> {
-  const { data, error } = await client.from("reportes").select("id").eq("id", id).maybeSingle();
-  // Ante la duda (error), se asume que existe: nunca se descarta un reporte del servidor.
-  if (error) return true;
-  return Boolean(data);
 }
 
 /**

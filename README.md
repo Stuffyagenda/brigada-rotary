@@ -48,8 +48,9 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    |---|---|
    | `002_realtime.sql` | Publica `public.reportes` en `supabase_realtime` |
    | `003_registro_fecha_visitas.sql` | Registro abierto, `reportes.fecha_reporte` y tabla `visitas` (detalle abajo). Idempotente: se puede volver a ejecutar |
+   | `004_sin_borrado.sql` | Retira las políticas DELETE de `reportes` y `visitas` y el privilegio `DELETE` de `authenticated`. Idempotente |
 
-   La 003 debe estar aplicada **antes** de desplegar la versión de la app que la usa: el cliente envía `fecha_reporte` en cada upsert y PostgREST rechaza columnas desconocidas (`PGRST204`).
+   El orden de ejecución es 002, 003, 004. La 003 debe estar aplicada **antes** de desplegar la versión de la app que la usa: el cliente envía `fecha_reporte` en cada upsert y PostgREST rechaza columnas desconocidas (`PGRST204`).
 3. Usuarios: con el registro abierto (ver más abajo) cada persona crea su cuenta en `/registro`. También se pueden crear en Authentication → Users. El trigger `on_auth_user_created` crea su perfil con rol `miembro` y activo; el rol `admin`, el club y el estado activo se cambian desde la página de miembros o por SQL.
 4. Regenerar los tipos cuando cambie el esquema:
 
@@ -83,7 +84,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
   | `created_at` | timestamptz not null default now() |
   | `created_by` | uuid → `profiles(id)` on delete set null; lo fija el trigger `set_visita_audit` con `auth.uid()` (en un update se conservan autor y `created_at`) |
 
-  Índice `(reporte_id, fecha desc)`. RLS: leer, crear y editar para miembros activos; borrar solo admin. Sin acceso para `anon`. Publicada en `supabase_realtime`.
+  Índice `(reporte_id, fecha desc)`. RLS: leer, crear y editar para miembros activos; sin política DELETE (migración 004). Sin acceso para `anon`. Publicada en `supabase_realtime`.
 
 ### Registro abierto (Auth)
 
@@ -120,7 +121,7 @@ app/
   (auth)/login/         Inicio de sesión
   (app)/                Rutas con sesión: mapa (/), registros, miembros
 components/
-  ui/                   Primitivas: Button, YesNo, Counter, Chip, HoldToDelete
+  ui/                   Primitivas: Button, YesNo, Counter, Chip
   map/ sheet/ form/     Mapa, ficha de triaje y panel, formularios de reporte y de visita
   sync/                 SyncProvider (arranca el motor) y SyncIndicator
   pwa/                  Registro del service worker e InstallButton
@@ -135,7 +136,7 @@ lib/
   types.ts              Tipos de dominio, etiquetas y esquema Zod
   db.ts                 Base local Dexie: reportes, visitas, outbox, meta
   vigencia.ts           Fechas en hora de Panamá y vigencia de la atención
-  sync/                 Motor de sincronización (saveReport, saveVisita, deleteReport, syncNow, useSyncState)
+  sync/                 Motor de sincronización (saveReport, saveVisita, syncNow, useSyncState)
   auth/profile.tsx      Perfil, club y rol del usuario (ProfileProvider, useProfile)
   pluscode.ts           Plus Codes (Open Location Code)
   places.ts geocode.ts  Búsqueda de lugares: Plus Code, comunidades locales, Nominatim
@@ -196,7 +197,7 @@ La búsqueda de `/registros` (`components/registros/buscar.ts` sobre `filtrarRep
 - Dexie v2 (`lib/db.ts`): tabla `visitas` (`id, reporte_id, fecha, _sync`) con `VisitaLocal = Visita & { _sync }`. La migración local desde la v1 rellena `fecha_reporte` (fecha de `created_at` en Panamá) en los reportes y en los upsert pendientes de la cola.
 - `saveVisita(input)` valida con `visitaSchema` (fecha no futura; al menos una entrega u observación), guarda la visita como `pending` y, en la misma transacción, actualiza el reporte por la ruta de `saveReport`: `estado = 'ATENDIDO'`, `attended_at = visitado_at` (la fecha de la visita con la hora actual de Panamá), `ent_*`/`ent_otros`/`observaciones_atencion` de la visita. Una visita con fecha anterior a la última atención entra al historial sin retroceder el reporte.
 - Cola: las entradas del `outbox` tienen `entidad` (`"reporte"` | `"visita"`; ausente = reporte, entradas de la v1). Las de visita llevan `reporteId` (de su reporte), `visitaId` y `visitaPayload`. `saveVisita` encola la visita detrás del upsert del reporte y el motor la envía siempre después de él (ver "Funcionamiento offline y sincronización").
-- `deleteReport` borra también las visitas locales del reporte; `limpiarEspejoLocal` borra las visitas sincronizadas.
+- `limpiarEspejoLocal` borra las visitas sincronizadas (al cerrar sesión).
 
 ## Roles y permisos
 
@@ -207,16 +208,15 @@ Los permisos se aplican en Postgres con Row Level Security; la UI solo oculta lo
 | Leer reportes, clubes y perfiles de otros | Sí | Sí | No |
 | Leer su propio perfil | Sí | Sí | Inactivo: sí (para ver que está desactivado). Sin sesión: no |
 | Crear y editar reportes | Sí | Sí | No |
-| Borrar reportes | No | Sí | No |
 | Ver y subir fotos (`fotos-viviendas`) | Sí | Sí | No |
 | Reemplazar una foto | Solo las propias | Solo las propias | No |
 | Borrar fotos | No | Sí | No |
 | Leer, crear y editar visitas | Sí | Sí | No |
-| Borrar visitas | No | Sí | No |
 | Editar su nombre y apellido | Sí | Sí | — |
 | Cambiar rol, club o estado activo | No | Sí | No |
 | Crear, editar y borrar clubes | No | Sí | No |
 
+- Los reportes y las visitas no se borran; solo se editan (RLS sin política DELETE y sin privilegio `DELETE` para `authenticated`, migración 004). Tampoco un admin puede borrarlos por la API. Siguen vigentes el `on delete cascade` de las claves foráneas y el borrado de fotos de Storage y de clubes por un admin.
 - `is_active_member()` e `is_admin()` (security definer) leen el perfil del usuario actual.
 - El trigger `set_reporte_audit` rellena `created_by`, `updated_by` y `updated_at`; `total_personas` es una columna generada.
 - Sin sesión (`anon`) solo se puede ejecutar `clubs_publicos()` (lista de clubes para el registro).
@@ -252,7 +252,7 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   2. `upsert(..., { onConflict: 'id' }).select().single()`. No se envían `total_personas`, `created_by`, `updated_by` ni `updated_at`: en el INSERT `updated_at` toma el `default now()` y en el UPDATE lo fija el trigger `set_reporte_audit` (no depende del reloj del celular). `created_at` sí se envía (hora real del registro en campo, aunque se sincronice horas después); en un UPDATE el trigger conserva el original.
   3. Con la fila devuelta, el reporte local pasa a `synced` y la entrada sale de la cola. Si el reporte se editó durante el envío, la entrada se conserva y se envía en la pasada siguiente.
 
-  Las entradas de visita van en el mismo orden de `seq`, pero una visita solo se envía si no queda en la cola ninguna entrada anterior de su reporte (pendiente, en espera o rechazada): la FK `visitas.reporte_id` exige que el reporte exista en el servidor. Se envía con `from('visitas').upsert(payload, { onConflict: 'id' }).select().single()` (sin `created_by`, que fija el trigger `set_visita_audit`) y, con la fila devuelta, la visita local pasa a `synced`. Si el servidor responde `23503` (el reporte ya no existe, p. ej. lo borró un admin), la visita queda `_sync: 'error'` con un mensaje claro.
+  Las entradas de visita van en el mismo orden de `seq`, pero una visita solo se envía si no queda en la cola ninguna entrada anterior de su reporte (pendiente, en espera o rechazada): la FK `visitas.reporte_id` exige que el reporte exista en el servidor. Se envía con `from('visitas').upsert(payload, { onConflict: 'id' }).select().single()` (sin `created_by`, que fija el trigger `set_visita_audit`) y, con la fila devuelta, la visita local pasa a `synced`. Si el servidor responde `23503` (el reporte no existe en el servidor), la visita queda `_sync: 'error'` con un mensaje claro.
 - **Errores** (`clasificarError` en `lib/sync/errors.ts`). `postgrest-js` devuelve el status HTTP en la respuesta (`{ data, error, status }`), no dentro de `error`; el motor lo añade al error (`conStatus`) antes de clasificarlo, y además clasifica por el código SQLSTATE/PostgREST:
 
   | Tipo | Ejemplos | Qué pasa |
@@ -276,11 +276,8 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   - cada 60 s con señal;
   - con el botón "Sincronizar ahora" (`syncNow()`).
 
-  Las pasadas van en una cola (`lib/sync/engine.ts`): nunca hay dos a la vez y una llamada durante una pasada programa una sola pasada más. `ejecutarExclusivo(fn)` encola una operación que corre después de la pasada en curso (y de la ya programada) y antes de cualquier pasada pedida mientras tanto.
-- **Borrado:** `deleteReport(id)` requiere señal (no se encola) y se ejecuta en exclusiva en esa cola: retira del `outbox` las entradas del reporte y de sus visitas (así ningún `upsert` pendiente lo "resucita" después del DELETE), ejecuta `delete().eq('id', id).select()` y, si falla, devuelve las entradas a la cola en su orden. Al confirmarse, borra también las visitas locales del reporte (en el servidor, `on delete cascade`).
-  - Si no borra ninguna fila, la RLS lo impidió: "solo un administrador puede hacerlo".
-  - Si el reporte solo existía en el dispositivo, se descarta localmente.
-  - También se intenta borrar la foto de Storage.
+  Las pasadas van en una cola (`lib/sync/engine.ts`): nunca hay dos a la vez y una llamada durante una pasada programa una sola pasada más. `ejecutarExclusivo(fn)` encola una operación (p. ej. `limpiarEspejoLocal`) que corre después de la pasada en curso (y de la ya programada) y antes de cualquier pasada pedida mientras tanto.
+- **Entradas `delete` heredadas:** los reportes y las visitas no se borran, así que nada encola `op: 'delete'`. Si un celular conserva una entrada así de una versión anterior, la pasada la retira del `outbox` sin enviar nada.
 - **Fotos:** `getFotoUrl(reporte)` devuelve, por orden:
   1. la URL `blob:` de la foto pendiente;
   2. una URL firmada de 1 h del bucket privado (en caché de memoria);
@@ -338,7 +335,7 @@ npm run test:e2e                 # end-to-end (levanta build + start)
 
 ### E2E de flujos (`e2e/flujos.spec.ts`)
 
-Cubren: inicio de sesión de miembro y admin; alta sin red (`context.setOffline`) que queda pendiente y se sincroniza al volver la señal; el miembro no ve "Mantén pulsado para borrar" y el admin sí (y borra el reporte de prueba); un miembro desactivado ve el aviso de acceso desactivado. Bloquean las peticiones a otros orígenes (teselas, Nominatim).
+Cubren: inicio de sesión de miembro y admin; alta sin red (`context.setOffline`) que queda pendiente y se sincroniza al volver la señal; ni el miembro ni el admin ven una acción de borrar en la ficha (los datos de prueba, con nombres ficticios únicos, quedan en el Supabase local); un miembro desactivado ve el aviso de acceso desactivado. Bloquean las peticiones a otros orígenes (teselas, Nominatim).
 
 Se saltan (`test.skip`, con el motivo) si falta alguna variable o si `NEXT_PUBLIC_SUPABASE_URL` no apunta a `localhost`/`127.0.0.1`, para no ejecutarse nunca contra el proyecto real.
 

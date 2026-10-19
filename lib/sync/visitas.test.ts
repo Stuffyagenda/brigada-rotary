@@ -1,6 +1,6 @@
 /**
  * Sincronización de visitas: cola (orden y colapso), envío con la FK del
- * reporte, pull, Realtime, borrado y cierre de sesión.
+ * reporte, pull, Realtime y cierre de sesión.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, type ReporteLocal, type VisitaLocal } from "@/lib/db";
@@ -18,7 +18,7 @@ import {
   filaRemota,
   visitaRemota,
 } from "@/lib/sync/testing/fake-supabase";
-import { deleteReport, limpiarEspejoLocal, saveReport, saveVisita, syncNow } from "@/lib/sync";
+import { limpiarEspejoLocal, saveReport, saveVisita, syncNow } from "@/lib/sync";
 import { reporteVacio, visitaVacia, type Visita } from "@/lib/types";
 import { hoyPanama } from "@/lib/vigencia";
 
@@ -375,38 +375,6 @@ describe("Realtime de visitas", () => {
 
     desuscribirRealtime();
     expect(fake.state.suscripciones).toEqual([]);
-  });
-});
-
-describe("deleteReport con visitas", () => {
-  it("si el DELETE falla, devuelve a la cola también las visitas pendientes, en su orden", async () => {
-    fake.state.rows.set(R1, filaRemota({ id: R1 }));
-    await reporteOffline(R1);
-    await saveVisita({ ...visitaVacia(R1), id: V1, ent_agua: true });
-    const antes = await entradas();
-    setOnline(true);
-    fake.state.deleteError = { message: "permission denied for table reportes", code: "42501", status: 403 };
-    await expect(deleteReport(R1)).rejects.toThrow("No se pudo borrar el reporte");
-    const despues = await entradas();
-    expect(despues.map((e) => [e.seq, e.entidad ?? "reporte"])).toEqual(antes.map((e) => [e.seq, e.entidad ?? "reporte"]));
-    expect((await db.visitas.get(V1))?._sync).toBe("pending");
-  });
-
-  it("al confirmar, no envía la visita pendiente y la borra del celular (cascade en el servidor)", async () => {
-    fake.state.rows.set(R1, filaRemota({ id: R1 }));
-    fake.state.visitas.set(V2, visitaRemota({ id: V2, reporte_id: R1 }));
-    await db.visitas.put(visitaLocal({ id: V2, reporte_id: R1 }));
-    await reporteOffline(R1);
-    await saveVisita({ ...visitaVacia(R1), id: V1, ent_agua: true });
-    setOnline(true);
-
-    await deleteReport(R1);
-    await syncNow();
-    expect(callsVisita()).toEqual([]);
-    expect(fake.state.rows.has(R1)).toBe(false);
-    expect(fake.state.visitas.size).toBe(0);
-    expect(await db.visitas.count()).toBe(0);
-    expect(await db.outbox.count()).toBe(0);
   });
 });
 

@@ -19,8 +19,6 @@ export const MSG_SIN_RED =
 export const MSG_RED_INESTABLE =
   "No se pudo conectar con el servidor. Los reportes quedan en este celular y se reintentará en breve.";
 export const MSG_SIN_CONFIG = "La app no tiene configurado el servidor (Supabase).";
-export const MSG_BORRAR_SIN_RED = "Necesitas conexión para borrar un reporte.";
-export const MSG_BORRAR_SOLO_ADMIN = "No se pudo borrar: solo un administrador puede hacerlo.";
 
 /** Forma mínima común a PostgrestError, StorageError y AuthError. */
 interface ErrorLike {

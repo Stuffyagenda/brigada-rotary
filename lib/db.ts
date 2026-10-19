@@ -32,7 +32,10 @@ export type VisitaLocal = Visita & {
   _sync: SyncStatus;
 };
 
-/** Operación de la cola. */
+/**
+ * Operación de la cola. `"delete"` ya no se produce (los reportes y las visitas
+ * no se borran); se conserva solo para leer entradas antiguas, que se descartan.
+ */
 export type OutboxOp = "upsert" | "delete";
 
 /** Entidad a la que se refiere una entrada de la cola. */
@@ -44,7 +47,7 @@ export type OutboxEntidad = "reporte" | "visita";
  * - Entidad `reporte` (o `entidad` ausente: entradas anteriores a la v2):
  *   `payload` es la fila de `reportes`.
  * - Entidad `visita`: `reporteId` es el `reporte_id` de la visita (así
- *   `deleteReport` y la reconciliación la tratan junto con su reporte),
+ *   la reconciliación la trata junto con su reporte),
  *   `visitaId` su id y `visitaPayload` la fila de `visitas`; `payload` es `null`.
  */
 export interface OutboxEntry {

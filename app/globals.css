@@ -41,7 +41,7 @@
   --color-aging-tint: #fef3e6; /* fondo suave de aging. ink encima 13.82:1, ink-soft 6.47:1, aging 4.59:1 */
   --color-stale: #000000; /* ATENDIDO hace 7+ días. Blanco sobre stale 21:1; stale sobre paper 19.38:1 */
   --color-line: #d5dce3; /* divisores */
-  --color-pending-strong: #7a0a1d; /* relleno de "mantén pulsado para borrar" */
+  --color-pending-strong: #7a0a1d;
   --color-map-bg: #e6eaee; /* fondo del mapa mientras cargan las teselas */
 
   /* Tipografía: base 17 px, escala 1.25 (13.6 / 17 / 21.25 / 26.5 / 33). */
