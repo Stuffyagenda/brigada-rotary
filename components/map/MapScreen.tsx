@@ -2,9 +2,13 @@
 
 /**
  * Pantalla principal: mapa a pantalla completa, buscador, filtros y panel
- * (Vaul en móvil, columna fija en escritorio) con resumen, ficha o formulario.
+ * (Vaul en móvil, columna fija en escritorio) con resumen, ficha, formulario
+ * o formulario de nueva visita.
  *
- * Todo el estado navegable vive en la URL (`?reporte=`, `?editar=1`, filtros)
+ * La vigencia de cada reporte (pendiente, atendido hace 0 a 3, 4 a 6 o 7+ días)
+ * se calcula con `useAhora()`: se renueva cada 10 minutos y al volver a la app.
+ *
+ * Todo el estado navegable vive en la URL (`?reporte=`, `?editar=1`, `?visita=1`, filtros)
  * y se actualiza con `history.pushState/replaceState`, que Next integra con
  * `useSearchParams` sin pedir nada al servidor (funciona sin conexión).
  * El mapa nunca se desmonta.
@@ -17,26 +21,29 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { toast } from "sonner";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { ReportForm } from "@/components/form/ReportForm";
+import { VisitaForm } from "@/components/form/VisitaForm";
 import { DesktopPanel } from "@/components/sheet/DesktopPanel";
 import { FichaPanel } from "@/components/sheet/FichaPanel";
 import { AccionesFicha } from "@/components/sheet/TriageTag";
 import { ALTO_ASOMADO, altoPanel, MobileSheet, SNAP, type SnapPanel } from "@/components/sheet/MobileSheet";
 import { PanelResumen } from "@/components/sheet/PanelResumen";
 import { SyncIndicator } from "@/components/sync/SyncIndicator";
+import { useAhora } from "@/hooks/useAhora";
 import { useReporte, useReportes } from "@/hooks/useReportes";
-import { useProfile } from "@/lib/auth/profile";
 import { cn } from "@/lib/cn";
 import type { GeocodeResult } from "@/lib/geocode";
 import type { LatLng } from "@/lib/pluscode";
+import type { Vigencia } from "@/lib/types";
+import { vigencia as vigenciaDe } from "@/lib/vigencia";
 import type { Capa, MapBounds } from "./BrigadaMap";
-import { EstadoChips, PanelFiltros } from "./Filters";
+import { PanelFiltros, VigenciaChips } from "./Filters";
 import { QUERY_ESCRITORIO, useClubs, useMediaQuery, useReducedMotion } from "./hooks";
 import { MapControls } from "./MapControls";
 import { SearchPill } from "./SearchPill";
 import {
   aplicarFiltros,
   contarFiltrosExtra,
-  contarPorEstado,
+  contarPorVigencia,
   hrefDe,
   parseFiltros,
   parseVista,
@@ -64,7 +71,7 @@ function claveVista(v: VistaPanel): string {
 
 function snapPara(v: VistaPanel, eligiendo: boolean, filtrosAbiertos: boolean): SnapPanel {
   if (eligiendo) return SNAP.asomado;
-  if (v.tipo === "formulario") return SNAP.completa;
+  if (v.tipo === "formulario" || v.tipo === "visita") return SNAP.completa;
   if (filtrosAbiertos) return SNAP.media;
   if (v.tipo === "ficha") return SNAP.media;
   return SNAP.asomado;
@@ -83,18 +90,24 @@ export function MapScreen() {
   const vista = useMemo(() => parseVista(new URLSearchParams(qs)), [qs]);
   const esEscritorio = useMediaQuery(QUERY_ESCRITORIO);
   const reducedMotion = useReducedMotion();
-  const { isAdmin } = useProfile();
+  const ahora = useAhora();
 
   // ---- Datos -------------------------------------------------------------
   const { reportes: todos, loading } = useReportes();
   const clubes = useClubs(todos);
   // Nombres de contactos: el buscador nunca los envía a Nominatim.
   const contactos = useMemo(() => todos.map((r) => r.contacto_nombre), [todos]);
-  const sinEstado = useMemo(() => aplicarFiltros(todos, filtros, { omitirEstado: true }), [todos, filtros]);
-  const conteo = useMemo(() => contarPorEstado(sinEstado), [sinEstado]);
+  const sinVigencia = useMemo(
+    () => aplicarFiltros(todos, filtros, { omitirVigencia: true, ahora }),
+    [todos, filtros, ahora],
+  );
+  const conteo = useMemo(() => contarPorVigencia(sinVigencia, ahora), [sinVigencia, ahora]);
   const visibles = useMemo(
-    () => (filtros.estado.length ? sinEstado.filter((r) => filtros.estado.includes(r.estado)) : sinEstado),
-    [sinEstado, filtros.estado],
+    () =>
+      filtros.vigencia.length
+        ? sinVigencia.filter((r) => filtros.vigencia.includes(vigenciaDe(r, ahora)))
+        : sinVigencia,
+    [sinVigencia, filtros.vigencia, ahora],
   );
   const idSeleccionado = vista.tipo === "resumen" || vista.id === "nuevo" ? null : vista.id;
   const { reporte: seleccionado } = useReporte(idSeleccionado);
@@ -112,8 +125,11 @@ export function MapScreen() {
   const [capa, setCapa] = useState<Capa>("calles");
   const [localizando, setLocalizando] = useState(false);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
-  const [animarAtendidoId, setAnimarAtendidoId] = useState<string | null>(null);
-  const estadoAlEditar = useRef<string | null>(null);
+  // Momento orquestado de la ficha al volver de guardar: vigencia anterior del caso.
+  const [animacion, setAnimacion] = useState<{ id: string; desde: Vigencia } | null>(null);
+  const vigenciaAlAbrir = useRef<{ id: string; vigencia: Vigencia } | null>(null);
+  // Formulario de visita con cambios sin guardar: se avisa antes de recargar o cerrar la pestaña.
+  const [visitaSucia, setVisitaSucia] = useState(false);
 
   // Posición del panel: la fija cada vista; el usuario puede arrastrarlo después.
   const clave = `${claveVista(vista)}|${eligiendo}|${filtrosAbiertos}`;
@@ -122,6 +138,7 @@ export function MapScreen() {
     const vistaNueva = claveVista(vista);
     // Al entrar a editar un reporte existente, una ubicación elegida antes no debe moverlo.
     if (vistaNueva !== panel.vista && vista.tipo === "formulario" && vista.id !== "nuevo") setUbicacion(null);
+    if (vista.tipo !== "visita") setVisitaSucia(false);
     setPanel({ clave, snap: snapPara(vista, eligiendo, filtrosAbiertos), vista: vistaNueva });
   }
   const snap = panel.snap;
@@ -139,32 +156,68 @@ export function MapScreen() {
   }, []);
 
   const cerrarFicha = useCallback(() => {
-    setAnimarAtendidoId(null);
+    setAnimacion(null);
     irA({ tipo: "resumen" }, { replace: true });
   }, [irA]);
 
   const abrirFicha = useCallback(
     (id: string) => {
       setFiltrosAbiertos(false);
-      setAnimarAtendidoId(null);
+      setAnimacion(null);
       irA({ tipo: "ficha", id }, { replace: vista.tipo === "ficha" });
     },
     [irA, vista.tipo],
   );
 
+  /** Guarda la vigencia del caso antes de abrir un formulario (para el momento orquestado). */
+  const recordarVigencia = useCallback(
+    (id: string) => {
+      vigenciaAlAbrir.current =
+        seleccionado?.id === id ? { id, vigencia: vigenciaDe(seleccionado, new Date()) } : null;
+    },
+    [seleccionado],
+  );
+
+  /** Al volver a la ficha tras guardar: la franja cambia desde la vigencia anterior. */
+  const volverTrasGuardar = useCallback(
+    (id: string) => {
+      const antes = vigenciaAlAbrir.current;
+      vigenciaAlAbrir.current = null;
+      setAnimacion(antes?.id === id ? { id, desde: antes.vigencia } : null);
+      irA({ tipo: "ficha", id }, { replace: true });
+    },
+    [irA],
+  );
+
   const abrirEdicion = useCallback(
     (id: string) => {
-      estadoAlEditar.current = seleccionado?.id === id ? seleccionado.estado : null;
+      recordarVigencia(id);
       irA({ tipo: "formulario", id });
     },
-    [irA, seleccionado],
+    [irA, recordarVigencia],
+  );
+
+  const abrirVisita = useCallback(
+    (id: string) => {
+      recordarVigencia(id);
+      irA({ tipo: "visita", id });
+    },
+    [irA, recordarVigencia],
   );
 
   const abrirNuevo = useCallback(() => {
     setFiltrosAbiertos(false);
-    estadoAlEditar.current = null;
+    vigenciaAlAbrir.current = null;
     irA({ tipo: "formulario", id: "nuevo" }, { replace: vista.tipo !== "resumen" });
   }, [irA, vista.tipo]);
+
+  // Con una visita a medio escribir, el navegador pregunta antes de recargar o cerrar.
+  useEffect(() => {
+    if (!visitaSucia) return;
+    const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [visitaSucia]);
 
   // ---- Mapa ----------------------------------------------------------------
   const altoTapado = useCallback(
@@ -212,8 +265,8 @@ export function MapScreen() {
 
   const onSelect = useCallback(
     (id: string) => {
-      // Con el formulario abierto, un toque en un pin no debe descartar lo escrito.
-      if (vista.tipo === "formulario") return;
+      // Con un formulario abierto, un toque en un pin no debe descartar lo escrito.
+      if (vista.tipo === "formulario" || vista.tipo === "visita") return;
       abrirFicha(id);
     },
     [vista.tipo, abrirFicha],
@@ -272,9 +325,11 @@ export function MapScreen() {
   }, [esEscritorio, onEscape]);
 
   // ---- Contenido del panel ------------------------------------------------
-  const hayFiltros = filtros.estado.length + contarFiltrosExtra(filtros) > 0;
+  const hayFiltros = filtros.vigencia.length + contarFiltrosExtra(filtros) > 0;
   const titulo =
-    vista.tipo === "formulario"
+    vista.tipo === "visita"
+      ? "Registrar nueva visita"
+      : vista.tipo === "formulario"
       ? vista.id === "nuevo"
         ? "Registrar familia"
         : "Editar reporte"
@@ -297,14 +352,29 @@ export function MapScreen() {
             ? irA({ tipo: "resumen" }, { replace: true })
             : irA({ tipo: "ficha", id: vista.id }, { replace: true })
         }
-        onSaved={(id, estado) => {
-          if (estado === "ATENDIDO" && estadoAlEditar.current === "PENDIENTE") setAnimarAtendidoId(id);
-          estadoAlEditar.current = null;
+        onSaved={(id) => {
           setUbicacion(null);
           setEligiendo(false);
-          irA({ tipo: "ficha", id }, { replace: true });
+          volverTrasGuardar(id);
         }}
       />
+    );
+  } else if (vista.tipo === "visita") {
+    const id = vista.id;
+    contenido = (
+      // Si el formulario no gestiona su propio scroll, este contenedor lo hace.
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        <VisitaForm
+          key={id}
+          reporteId={id}
+          onClose={() => {
+            vigenciaAlAbrir.current = null;
+            irA({ tipo: "ficha", id }, { replace: true });
+          }}
+          onSaved={() => volverTrasGuardar(id)}
+          onDirtyChange={setVisitaSucia}
+        />
+      </div>
     );
   } else if (filtrosAbiertos && !esEscritorio) {
     contenido = (
@@ -321,11 +391,11 @@ export function MapScreen() {
       <FichaPanel
         id={vista.id}
         nombresClub={clubes.nombres}
-        isAdmin={isAdmin}
-        animarAtendido={animarAtendidoId === vista.id}
+        animarDesde={animacion?.id === vista.id ? animacion.desde : null}
+        ahora={ahora}
         onCerrar={cerrarFicha}
         onEditar={() => abrirEdicion(vista.id)}
-        onBorrado={cerrarFicha}
+        onRegistrarVisita={() => abrirVisita(vista.id)}
         conAcciones={esEscritorio}
       />
     );
@@ -336,6 +406,7 @@ export function MapScreen() {
         hayReportes={todos.length > 0}
         loading={loading}
         hayFiltros={hayFiltros}
+        ahora={ahora}
         ubicacion={ubicacion}
         onAbrir={abrirFicha}
         onRegistrarAqui={abrirNuevo}
@@ -347,7 +418,7 @@ export function MapScreen() {
   const vistaKey = `${claveVista(vista)}|${filtrosAbiertos && !esEscritorio}`;
 
   const chips = (
-    <EstadoChips
+    <VigenciaChips
       filtros={filtros}
       conteo={conteo}
       onChange={setFiltros}
@@ -357,7 +428,8 @@ export function MapScreen() {
     />
   );
 
-  const mostrarFab = vista.tipo !== "formulario" && !eligiendo && (esEscritorio || snap === SNAP.asomado);
+  const conFormulario = vista.tipo === "formulario" || vista.tipo === "visita";
+  const mostrarFab = !conFormulario && !eligiendo && (esEscritorio || snap === SNAP.asomado);
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-paper">
@@ -365,7 +437,7 @@ export function MapScreen() {
         <DesktopPanel
           titulo={titulo}
           vistaKey={vistaKey}
-          contenidoPropio={vista.tipo === "formulario"}
+          contenidoPropio={conFormulario}
           filtros={
             <div className="flex flex-col gap-4">
               {chips}
@@ -392,6 +464,7 @@ export function MapScreen() {
         <section aria-label="Mapa" className="absolute inset-0">
           <BrigadaMap
             reportes={pines}
+            ahora={ahora}
             selectedId={idSeleccionado}
             ubicacion={ubicacion}
             capa={capa}
@@ -478,13 +551,14 @@ export function MapScreen() {
           titulo={titulo}
           onEscape={onEscape}
           vistaKey={vistaKey}
-          contenidoPropio={vista.tipo === "formulario"}
+          contenidoPropio={conFormulario}
           pie={
             vista.tipo === "ficha" && !filtrosAbiertos && seleccionado ? (
               <AccionesFicha
-                estado={seleccionado.estado}
+                vigencia={vigenciaDe(seleccionado, ahora)}
                 onEditar={() => abrirEdicion(seleccionado.id)}
                 onRegistrarEntrega={() => abrirEdicion(seleccionado.id)}
+                onRegistrarVisita={() => abrirVisita(seleccionado.id)}
               />
             ) : undefined
           }

@@ -4,19 +4,24 @@
  * Mapa de reportes (Leaflet). Solo cliente: se carga con `next/dynamic` y
  * `ssr: false` desde MapScreen.
  *
- * Pines: PENDIENTE = círculo relleno rojo con borde blanco; ATENDIDO = anillo
- * verde con relleno blanco (forma + color, nunca solo color). Los reportes sin
- * sincronizar llevan el borde discontinuo.
+ * Pines por vigencia de la atención (forma + color, nunca solo color; ver
+ * pin-estilo.ts): pendiente = círculo relleno rojo; atendido hace 0 a 3 días =
+ * anillo verde; 4 a 6 días = anillo naranja con punto central; 7 o más = rombo
+ * negro. Los reportes sin sincronizar llevan el borde discontinuo.
  */
 import "leaflet/dist/leaflet.css";
 import type { LeafletMouseEvent, Map as LeafletMap } from "leaflet";
-import { memo, useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { AttributionControl, CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { CircleMarker as LeafletCircleMarker } from "leaflet";
 import type { ReporteLocal } from "@/lib/db";
 import type { LatLng } from "@/lib/pluscode";
 import { cn } from "@/lib/cn";
+import type { Vigencia } from "@/lib/types";
+import { vigencia as vigenciaDe } from "@/lib/vigencia";
 import { COLOR } from "./colors";
+import { capasPin, ORDEN_DIBUJO, type CapaPin } from "./pin-estilo";
+import { RomboMarker } from "./RomboMarker";
 import "./brigada-map.css";
 
 export type Capa = "calles" | "satelite";
@@ -32,6 +37,8 @@ export const VISTA_INICIAL = { center: [7.965, -80.432] as [number, number], zoo
 
 export interface BrigadaMapProps {
   reportes: readonly ReporteLocal[];
+  /** Referencia de la vigencia de cada pin (la de `useAhora()`). */
+  ahora: Date;
   selectedId: string | null;
   /** Ubicación elegida para el formulario (GPS, toque o búsqueda). */
   ubicacion: LatLng | null;
@@ -111,44 +118,60 @@ function CursorElegir({ picking }: { picking: boolean }) {
 
 interface PinProps {
   reporte: ReporteLocal;
+  vigencia: Vigencia;
   selected: boolean;
   picking: boolean;
   onSelect: (id: string) => void;
   onPick: (punto: LatLng) => void;
 }
 
-const Pin = memo(function Pin({ reporte: r, selected, picking, onSelect, onPick }: PinProps) {
-  const ref = useRef<LeafletCircleMarker>(null);
-  const pendiente = r.estado === "PENDIENTE";
-  const sincronizado = r._sync === "synced";
+function opcionesCapa(c: CapaPin) {
+  return {
+    stroke: !c.sinBorde,
+    color: c.borde,
+    weight: c.grosor,
+    fillColor: c.relleno,
+    fillOpacity: 1,
+    opacity: 1,
+    dashArray: c.discontinuo,
+  };
+}
 
-  // La clase de selección se cambia en el elemento SVG para que la escala se anime.
+const Pin = memo(function Pin({ reporte: r, vigencia, selected, picking, onSelect, onPick }: PinProps) {
+  const capasRef = useRef<Array<LeafletCircleMarker | null>>([]);
+  const capas = capasPin(vigencia, r._sync === "synced");
+
+  // La clase de selección se cambia en los elementos SVG para que la escala se anime.
+  // Depende de la vigencia: si cambia la forma, las capas se crean de nuevo.
   useEffect(() => {
-    const layer = ref.current;
-    const el = layer?.getElement();
-    if (!layer || !el) return;
-    el.classList.toggle("brm-pinSelected", selected);
-    if (selected) layer.bringToFront();
-  }, [selected]);
+    for (const layer of capasRef.current) {
+      const el = layer?.getElement();
+      if (!layer || !el) continue;
+      el.classList.toggle("brm-pinSelected", selected);
+      if (selected) layer.bringToFront();
+    }
+  }, [selected, vigencia]);
 
   return (
     <>
-      <CircleMarker
-        ref={ref}
-        center={[r.lat, r.lng]}
-        radius={pendiente ? 9 : 8}
-        interactive={false}
-        // `className` va como prop: Leaflet solo la aplica al crear el path (setStyle la ignora).
-        className="brm-pin"
-        pathOptions={{
-          color: pendiente ? COLOR.white : COLOR.done,
-          weight: pendiente ? 2.5 : 4,
-          fillColor: pendiente ? COLOR.pending : COLOR.white,
-          fillOpacity: 1,
-          opacity: 1,
-          dashArray: sincronizado ? undefined : pendiente ? "3 2.5" : "4 2.5",
-        }}
-      />
+      {capas.map((c, i) => {
+        const props = {
+          center: [r.lat, r.lng] as [number, number],
+          radius: c.radio,
+          interactive: false,
+          // `className` va como prop: Leaflet solo la aplica al crear el path (setStyle la ignora).
+          className: "brm-pin",
+          pathOptions: opcionesCapa(c),
+          ref: (layer: LeafletCircleMarker | null) => {
+            capasRef.current[i] = layer;
+          },
+        };
+        return c.forma === "rombo" ? (
+          <RomboMarker key={`${vigencia}-${i}`} {...props} />
+        ) : (
+          <CircleMarker key={`${vigencia}-${i}`} {...props} />
+        );
+      })}
       <CircleMarker
         center={[r.lat, r.lng]}
         radius={22}
@@ -168,6 +191,7 @@ const Pin = memo(function Pin({ reporte: r, selected, picking, onSelect, onPick 
 
 function BrigadaMap({
   reportes,
+  ahora,
   selectedId,
   ubicacion,
   capa,
@@ -180,6 +204,14 @@ function BrigadaMap({
   onBoundsChange,
 }: BrigadaMapProps) {
   const seleccionado = selectedId ? reportes.find((r) => r.id === selectedId) : undefined;
+  // Vigencia de cada pin y orden de dibujo: lo más urgente encima.
+  const instante = ahora.getTime();
+  const pines = useMemo(() => {
+    const ref = new Date(instante);
+    return reportes
+      .map((r) => ({ r, v: vigenciaDe(r, ref) }))
+      .sort((a, b) => ORDEN_DIBUJO[a.v] - ORDEN_DIBUJO[b.v]);
+  }, [reportes, instante]);
   const tiles = TILES[capa];
   const refMapa = useCallback(
     (map: LeafletMap | null) => {
@@ -217,10 +249,11 @@ function BrigadaMap({
         />
         <CursorElegir picking={picking} />
 
-        {reportes.map((r) => (
+        {pines.map(({ r, v }) => (
           <Pin
             key={r.id}
             reporte={r}
+            vigencia={v}
             selected={r.id === selectedId}
             picking={picking}
             onSelect={onSelect}

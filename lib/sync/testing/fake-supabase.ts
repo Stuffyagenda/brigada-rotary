@@ -1,12 +1,14 @@
 /**
  * Cliente de Supabase simulado para los tests del motor de sync.
- * Implementa solo las llamadas que usa lib/sync, con una tabla `reportes` en memoria.
+ * Implementa solo las llamadas que usa lib/sync, con las tablas `reportes` y
+ * `visitas` en memoria (FK `visitas.reporte_id` con `on delete cascade` y la
+ * auditoría de `set_visita_audit`), y un Realtime manual (`emitirRealtime`).
  *
  * Como `postgrest-js` 2.x, las consultas devuelven `{ data, error, status }`: el
  * `status` HTTP va en la respuesta y el `error` solo trae `message`, `code`,
  * `details` y `hint`. Storage, en cambio, sí incluye `status`/`statusCode` en el error.
  */
-import { totalPersonas, type Reporte } from "@/lib/types";
+import { totalPersonas, type Reporte, type Visita } from "@/lib/types";
 
 /**
  * Error a simular. En las consultas a tablas, `status` se usa como status HTTP
@@ -24,18 +26,39 @@ export interface FakeError {
 /** Error tal como lo devuelve PostgREST (sin status). */
 export type PostgrestErrorLike = { message: string; code: string; details: string; hint: string };
 
+/** Suscripción Realtime registrada con `channel(...).on("postgres_changes", ...)`. */
+export interface FakeSuscripcion {
+  canal: string;
+  table: string;
+  callback: (payload: unknown) => void;
+}
+
 export interface FakeState {
   rows: Map<string, Reporte>;
+  /** Tabla `visitas` en memoria. */
+  visitas: Map<string, Visita>;
+  /**
+   * Si es `true`, la tabla `visitas` no existe (servidor sin la migración 003):
+   * toda consulta responde `PGRST205` con status 404, como PostgREST.
+   */
+  visitasAusente: boolean;
+  /** Error a devolver en el próximo select de `visitas` (se consume). */
+  visitasSelectError: FakeError | null;
   session: { access_token: string } | null;
-  /** Orden de las llamadas ("upload:<path>", "upsert:<id>", "select", "delete:<id>"…). */
+  /**
+   * Orden de las llamadas. Reportes: "upload:<path>", "upsert:<id>", "select",
+   * "delete:<id>". Visitas: "visitas.upsert:<id>", "visitas.select", "visitas.delete:<id>".
+   */
   calls: string[];
+  /** Suscripciones Realtime activas. */
+  suscripciones: FakeSuscripcion[];
   uploads: { path: string; blob: Blob; options: unknown }[];
   removed: string[];
   /** Error a devolver en el próximo upsert (se consume). */
   upsertError: FakeError | null;
   /**
-   * Errores a devolver en los próximos upserts, por id de reporte (se consumen).
-   * Permite rechazar un reporte concreto y dejar pasar los demás.
+   * Errores a devolver en los próximos upserts, por id de reporte o de visita
+   * (se consumen). Permite rechazar una fila concreta y dejar pasar las demás.
    */
   upsertErrorPorId: Map<string, FakeError>;
   /** Error a devolver en el próximo delete (se consume). */
@@ -50,6 +73,8 @@ export interface FakeState {
   /** Si es `true`, el delete no borra nada (simula la RLS de un miembro). */
   deleteBloqueado: boolean;
   upsertBodies: Record<string, unknown>[];
+  /** Cuerpos enviados en los upserts de `visitas`. */
+  visitaBodies: Record<string, unknown>[];
 }
 
 type Resultado = { data: unknown; error: PostgrestErrorLike | null; status: number; statusText: string };
@@ -70,6 +95,12 @@ function respuestaError(e: FakeError): Resultado {
 
 const ok = (data: unknown, status = 200): Resultado => ({ data, error: null, status, statusText: "OK" });
 
+const TABLA_AUSENTE: FakeError = {
+  message: "Could not find the table 'public.visitas' in the schema cache",
+  code: "PGRST205",
+  status: 404,
+};
+
 class Query implements PromiseLike<Resultado> {
   private op: "select" | "upsert" | "delete" = "select";
   private body: Record<string, unknown> | null = null;
@@ -77,7 +108,10 @@ class Query implements PromiseLike<Resultado> {
   private rango: [number, number] | null = null;
   private modo: "many" | "single" | "maybeSingle" = "many";
 
-  constructor(private readonly state: FakeState) {}
+  constructor(
+    private readonly state: FakeState,
+    private readonly tabla: string = "reportes",
+  ) {}
 
   select(): this {
     return this;
@@ -112,6 +146,7 @@ class Query implements PromiseLike<Resultado> {
   }
 
   private ejecutar(): Resultado {
+    if (this.tabla === "visitas") return this.ejecutarVisitas();
     const s = this.state;
     if (this.op === "upsert") {
       const body = this.body!;
@@ -153,7 +188,11 @@ class Query implements PromiseLike<Resultado> {
       }
       if (s.deleteBloqueado) return ok([]);
       const borradas = [...s.rows.values()].filter(coincide);
-      for (const r of borradas) s.rows.delete(r.id);
+      for (const r of borradas) {
+        s.rows.delete(r.id);
+        // FK on delete cascade.
+        for (const v of [...s.visitas.values()]) if (v.reporte_id === r.id) s.visitas.delete(v.id);
+      }
       return ok(borradas);
     }
 
@@ -162,6 +201,64 @@ class Query implements PromiseLike<Resultado> {
     if (this.rango) filas = filas.slice(this.rango[0], this.rango[1] + 1);
     if (this.modo === "maybeSingle") return ok(filas[0] ?? null);
     if (this.modo === "single") return ok(filas[0] ?? null);
+    return ok(filas);
+  }
+
+  /** `public.visitas`: upsert con FK y auditoría, select paginado y delete. */
+  private ejecutarVisitas(): Resultado {
+    const s = this.state;
+    const prefijo = "visitas.";
+    if (this.op === "upsert") {
+      const body = this.body!;
+      s.calls.push(`${prefijo}upsert:${String(body.id)}`);
+      if (s.visitasAusente) return respuestaError(TABLA_AUSENTE);
+      s.visitaBodies.push(body);
+      const porId = s.upsertErrorPorId.get(String(body.id));
+      if (porId) {
+        s.upsertErrorPorId.delete(String(body.id));
+        return respuestaError(porId);
+      }
+      if (!s.rows.has(String(body.reporte_id))) {
+        return respuestaError({
+          message:
+            'insert or update on table "visitas" violates foreign key constraint "visitas_reporte_id_fkey"',
+          code: "23503",
+          status: 409,
+        });
+      }
+      const previa = s.visitas.get(String(body.id));
+      const fila = {
+        ...(body as unknown as Visita),
+        // set_visita_audit: en un update se conservan autor y fecha de alta.
+        created_at: previa?.created_at ?? String(body.created_at ?? new Date().toISOString()),
+        created_by: previa ? previa.created_by : "user-1",
+      } as Visita;
+      s.visitas.set(fila.id, fila);
+      return ok(fila, 201);
+    }
+
+    const coincide = (v: Visita) =>
+      this.filtros.every(([c, val]) => (v as unknown as Record<string, unknown>)[c] === val);
+
+    if (this.op === "delete") {
+      const id = String(this.filtros.find(([c]) => c === "id")?.[1]);
+      s.calls.push(`${prefijo}delete:${id}`);
+      if (s.visitasAusente) return respuestaError(TABLA_AUSENTE);
+      const borradas = [...s.visitas.values()].filter(coincide);
+      for (const v of borradas) s.visitas.delete(v.id);
+      return ok(borradas);
+    }
+
+    s.calls.push(`${prefijo}select`);
+    if (s.visitasAusente) return respuestaError(TABLA_AUSENTE);
+    if (s.visitasSelectError) {
+      const error = s.visitasSelectError;
+      s.visitasSelectError = null;
+      return respuestaError(error);
+    }
+    let filas = [...s.visitas.values()].filter(coincide).sort((a, b) => a.id.localeCompare(b.id));
+    if (this.rango) filas = filas.slice(this.rango[0], this.rango[1] + 1);
+    if (this.modo !== "many") return ok(filas[0] ?? null);
     return ok(filas);
   }
 
@@ -182,8 +279,12 @@ class Query implements PromiseLike<Resultado> {
 export function createFakeSupabase() {
   const state: FakeState = {
     rows: new Map(),
+    visitas: new Map(),
+    visitasAusente: false,
+    visitasSelectError: null,
     session: { access_token: "token" },
     calls: [],
+    suscripciones: [],
     uploads: [],
     removed: [],
     upsertError: null,
@@ -193,6 +294,7 @@ export function createFakeSupabase() {
     uploadError: null,
     deleteBloqueado: false,
     upsertBodies: [],
+    visitaBodies: [],
   };
 
   const storageBucket = {
@@ -226,20 +328,52 @@ export function createFakeSupabase() {
       },
     },
     storage: { from: () => storageBucket },
-    from: () => new Query(state),
-    channel() {
+    from: (tabla: string) => new Query(state, tabla),
+    channel(nombre: string) {
       const canal = {
-        on: () => canal,
+        nombre,
+        on: (_tipo: string, filtro: { table?: string }, callback: (payload: unknown) => void) => {
+          state.suscripciones.push({ canal: nombre, table: filtro?.table ?? "", callback });
+          return canal;
+        },
         subscribe: () => canal,
       };
       return canal;
     },
-    async removeChannel() {
+    async removeChannel(canal: { nombre?: string }) {
+      state.suscripciones = state.suscripciones.filter((s) => s.canal !== canal?.nombre);
       return "ok";
     },
   };
 
   return { client, state };
+}
+
+/** Entrega un evento `postgres_changes` a las suscripciones de esa tabla. */
+export function emitirRealtime(state: FakeState, table: string, payload: Record<string, unknown>): void {
+  const evento = { schema: "public", table, commit_timestamp: "", errors: [], ...payload };
+  for (const s of state.suscripciones) if (s.table === table) s.callback(evento);
+}
+
+/** Visita remota completa para sembrar la tabla simulada. */
+export function visitaRemota(base: Partial<Visita> & { id: string; reporte_id: string }): Visita {
+  return {
+    fecha: "2026-10-01",
+    visitado_at: "2026-10-01T15:00:00.000Z",
+    brigadista_texto: null,
+    ent_agua: false,
+    ent_kit_alimento: false,
+    ent_kit_higiene: false,
+    ent_lona: false,
+    ent_camping: false,
+    ent_toldas: false,
+    ent_colchonetas: false,
+    ent_otros: [],
+    observaciones: null,
+    created_at: "2026-10-01T15:00:00.000Z",
+    created_by: "user-2",
+    ...base,
+  };
 }
 
 /** Reporte remoto completo para sembrar la tabla simulada. */

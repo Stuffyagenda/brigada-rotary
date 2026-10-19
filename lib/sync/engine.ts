@@ -2,7 +2,8 @@
  * Orquestación del motor de sync: una sola pasada a la vez (cola), operaciones
  * exclusivas, disparadores automáticos y suscripción a Realtime según la sesión y la red.
  *
- * Una pasada = enviar la cola (push) y, si todo fue bien, descargar y reconciliar (pull).
+ * Una pasada = enviar la cola (push) y, si todo fue bien, descargar y reconciliar
+ * (pull de reportes y después de visitas).
  */
 import { db } from "@/lib/db";
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
@@ -15,7 +16,7 @@ import {
   MSG_SIN_CONFIG,
   MSG_SIN_RED,
 } from "@/lib/sync/errors";
-import { pullReportes } from "@/lib/sync/pull";
+import { pullReportes, pullVisitas } from "@/lib/sync/pull";
 import { pushOutbox } from "@/lib/sync/push";
 import { desuscribirRealtime, suscribirRealtime } from "@/lib/sync/realtime";
 import { META_LAST_SYNC, setEngineState } from "@/lib/sync/state";
@@ -73,9 +74,11 @@ async function pasada(force: boolean): Promise<PasadaResult> {
     }
 
     await pullReportes(client);
+    // Sin la tabla `visitas` en el servidor (migración 003 pendiente) se omiten, sin error para el usuario.
+    const conVisitas = await pullVisitas(client);
     await db.meta.put({ key: META_LAST_SYNC, value: new Date().toISOString() });
     setEngineState({ lastError: push.error });
-    if (isOnline()) suscribirRealtime(client);
+    if (isOnline()) suscribirRealtime(client, { visitas: conVisitas });
     return { subidos, pendientes: await contarPendientes(), error: push.error };
   } catch (err) {
     const kind = clasificarError(err);

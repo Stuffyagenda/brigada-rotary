@@ -15,6 +15,13 @@ export const inputClass =
   "block min-h-12 w-full rounded-lg border border-line bg-white px-3 text-base text-ink " +
   "placeholder:text-ink-soft aria-invalid:border-pending aria-invalid:bg-pending-tint/40";
 
+/**
+ * Campo `type="date"`: mismas medidas que el resto; en iOS el valor se alinea a
+ * la izquierda (Safari lo centra) y el control no se encoge a su contenido.
+ */
+export const inputFechaClass =
+  inputClass + " appearance-none text-left tabular-nums [&::-webkit-date-and-time-value]:text-left";
+
 /** Sección del formulario: `fieldset` con `legend` visible. */
 export function Seccion({
   titulo,

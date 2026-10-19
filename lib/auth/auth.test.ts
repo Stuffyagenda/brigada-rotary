@@ -9,7 +9,14 @@ import {
   MSG_SIN_CONEXION,
 } from "@/lib/auth/errors";
 import { clearPerfilCache, PERFIL_KEY, readPerfilCache, writePerfilCache } from "@/lib/auth/profile-cache";
-import { decideProxyRedirect, isPublicPath, loginUrl, safeNextPath } from "@/lib/auth/redirect";
+import {
+  authSwitchHref,
+  decideProxyRedirect,
+  isAuthPath,
+  isPublicPath,
+  loginUrl,
+  safeNextPath,
+} from "@/lib/auth/redirect";
 import { db } from "@/lib/db";
 import type { Profile } from "@/lib/types";
 
@@ -35,8 +42,12 @@ describe("safeNextPath", () => {
     }
   });
 
-  it("nunca vuelve a /login", () => {
+  it("nunca vuelve a /login ni a /registro", () => {
     expect(safeNextPath("/login?next=/x")).toBe("/");
+    expect(safeNextPath("/registro")).toBe("/");
+    expect(safeNextPath("/registro?next=/x")).toBe("/");
+    // /registros (lista de reportes) sí es un destino válido.
+    expect(safeNextPath("/registros")).toBe("/registros");
   });
 });
 
@@ -53,6 +64,24 @@ describe("loginUrl e isPublicPath", () => {
     expect(isPublicPath("/")).toBe(false);
     expect(isPublicPath("/miembros")).toBe(false);
     expect(isPublicPath("/loginx")).toBe(false);
+  });
+
+  it("marca /registro como pública sin confundirla con /registros", () => {
+    expect(isPublicPath("/registro")).toBe(true);
+    expect(isAuthPath("/registro")).toBe(true);
+    expect(isAuthPath("/login")).toBe(true);
+    expect(isPublicPath("/registros")).toBe(false);
+    expect(isAuthPath("/registros")).toBe(false);
+    expect(isAuthPath("/")).toBe(false);
+  });
+
+  it("enlaza /login y /registro conservando solo un next interno", () => {
+    expect(authSwitchHref("/registro", "")).toBe("/registro");
+    expect(authSwitchHref("/registro", "?next=%2Fregistros%3Fq%3D1")).toBe("/registro?next=%2Fregistros%3Fq%3D1");
+    expect(authSwitchHref("/login", "?next=%2Fmiembros")).toBe("/login?next=%2Fmiembros");
+    expect(authSwitchHref("/login", "?next=https%3A%2F%2Fevil.example")).toBe("/login");
+    expect(authSwitchHref("/login", "?next=%2Fregistro")).toBe("/login");
+    expect(authSwitchHref("/login", "?otra=1")).toBe("/login");
   });
 });
 
@@ -84,6 +113,34 @@ describe("decideProxyRedirect", () => {
     expect(
       decideProxyRedirect({ ...base, pathname: "/login", search: "?next=https://evil.example", signedIn: true }),
     ).toBe("/");
+  });
+});
+
+describe("decideProxyRedirect en /registro", () => {
+  const base = { search: "", method: "GET" };
+
+  it("deja ver /registro sin sesión", () => {
+    expect(decideProxyRedirect({ ...base, pathname: "/registro", signedIn: false })).toBeNull();
+    expect(decideProxyRedirect({ ...base, pathname: "/registro", signedIn: null })).toBeNull();
+  });
+
+  it("con sesión saca de /registro a la app o al next seguro", () => {
+    expect(decideProxyRedirect({ ...base, pathname: "/registro", signedIn: true })).toBe("/");
+    expect(
+      decideProxyRedirect({ ...base, pathname: "/registro", search: "?next=%2Fregistros", signedIn: true }),
+    ).toBe("/registros");
+    expect(
+      decideProxyRedirect({ ...base, pathname: "/registro", search: "?next=//evil.example", signedIn: true }),
+    ).toBe("/");
+    expect(
+      decideProxyRedirect({ ...base, pathname: "/registro", search: "?next=%2Flogin", signedIn: true }),
+    ).toBe("/");
+  });
+
+  it("sigue protegiendo /registros (lista de reportes)", () => {
+    expect(decideProxyRedirect({ ...base, pathname: "/registros", signedIn: false })).toBe(
+      "/login?next=%2Fregistros",
+    );
   });
 });
 

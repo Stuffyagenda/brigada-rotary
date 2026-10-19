@@ -27,7 +27,7 @@ import {
   MSG_SIN_CONFIG,
 } from "@/lib/sync/errors";
 import { limpiarCacheFotos, olvidarFoto } from "@/lib/sync/foto";
-import { contarColaReporte, encolarUpsert } from "@/lib/sync/outbox";
+import { contarColaReporte, encolarUpsert, encolarVisita, tieneColaVisita } from "@/lib/sync/outbox";
 import { rutaFotoNueva, uuid } from "@/lib/sync/uuid";
 import { getEngineState, META_LAST_SYNC, subscribeEngine } from "@/lib/sync/state";
 import {
@@ -38,11 +38,13 @@ import {
   type ReporteInput,
   type ReporteUpsert,
   type VisitaInput,
+  type VisitaUpsert,
 } from "@/lib/types";
 import { instanteEnFechaPanama } from "@/lib/vigencia";
 
 export { startSyncEngine } from "@/lib/sync/engine";
 export { getFotoUrl } from "@/lib/sync/foto";
+export { MSG_VISITA_REPORTE_INEXISTENTE } from "@/lib/sync/push";
 
 // ---------------------------------------------------------------------------
 // Tipos del contrato
@@ -254,7 +256,11 @@ function textoONull(v: string | null | undefined): string | null {
  *    upsert normal): `estado = 'ATENDIDO'`, `attended_at = visitado_at`,
  *    `ent_*`/`ent_otros`/`observaciones_atencion` = los de la visita. Si la
  *    visita es anterior a la última atención del reporte, este no cambia.
- * 4. Con señal, intenta sincronizar enseguida (hasta 8 s).
+ * 4. Encola la visita (`entidad: 'visita'`) después del upsert del reporte:
+ *    el motor envía siempre antes el reporte (FK). Varios guardados de la misma
+ *    visita quedan en una sola entrada.
+ * 5. Con señal, intenta sincronizar enseguida (hasta 8 s): `synced` solo si el
+ *    servidor confirmó el reporte y la visita.
  *
  * @throws Error "No se encontró el reporte de esta visita." si el reporte no está en el celular.
  * @returns id de la visita y si quedó sincronizada o pendiente.
@@ -270,7 +276,7 @@ export async function saveVisita(input: VisitaInput): Promise<SaveVisitaResult> 
     if (!reporte) throw new Error(MSG_VISITA_SIN_REPORTE);
     const previa = await db.visitas.get(id);
 
-    const visita: VisitaLocal = {
+    const payload: VisitaUpsert = {
       id,
       reporte_id: parsed.reporte_id,
       fecha: parsed.fecha,
@@ -286,9 +292,8 @@ export async function saveVisita(input: VisitaInput): Promise<SaveVisitaResult> 
       ent_otros: [...parsed.ent_otros],
       observaciones: textoONull(parsed.observaciones),
       created_at: previa?.created_at ?? ahora.toISOString(),
-      created_by: previa?.created_by ?? null,
-      _sync: "pending",
     };
+    const visita: VisitaLocal = { ...payload, created_by: previa?.created_by ?? null, _sync: "pending" };
     await db.visitas.put(visita);
 
     // El reporte refleja la última entrega (ruta normal de guardado, queda en
@@ -311,17 +316,21 @@ export async function saveVisita(input: VisitaInput): Promise<SaveVisitaResult> 
       );
     }
 
-    // TODO(sync-visitas): encolar aquí la visita (entrada del outbox con
-    // `entidad: 'visita'`, `reporteId: visita.reporte_id`, `visitaId: id`,
-    // `op: 'upsert'` y `visitaPayload` = la visita sin `_sync` ni `created_by`),
-    // en esta misma transacción y DESPUÉS del upsert del reporte: así su `seq`
-    // es mayor (si el reporte ya tenía un upsert en cola, el colapso conserva
-    // su `seq` anterior) y el motor envía el reporte antes que la visita (FK).
-    // Hoy la visita queda solo en el celular (`_sync: 'pending'`) y `pushOutbox`
-    // ignora las entradas de visita.
+    // Después del upsert del reporte: su `seq` es mayor y el motor envía antes
+    // el reporte (FK). `encolarVisita` lo garantiza también al colapsar.
+    await encolarVisita(payload, ahora.toISOString());
   });
 
-  const status = await intentarEnvio(async () => (await db.visitas.get(id))?._sync === "synced");
+  const status = await intentarEnvio(async () => {
+    const reporteId = parsed.reporte_id;
+    const [visita, reporte, colaReporte, colaVisita] = await Promise.all([
+      db.visitas.get(id),
+      db.reportes.get(reporteId),
+      contarColaReporte(reporteId),
+      tieneColaVisita(reporteId, id),
+    ]);
+    return visita?._sync === "synced" && !colaVisita && reporte?._sync === "synced" && colaReporte === 0;
+  });
   return { id, status };
 }
 
@@ -349,9 +358,10 @@ function conTiempoLimite<T>(promesa: Promise<T>, ms: number): Promise<T | undefi
  * a los miembros). Requiere conexión: un borrado no se encola.
  *
  * Se ejecuta en exclusiva en la cola del motor: espera a la pasada en curso y
- * ninguna pasada corre mientras borra. Las entradas del outbox de ese reporte se
- * retiran antes del DELETE remoto (así ningún upsert pendiente puede "resucitarlo")
- * y se restauran si el borrado falla.
+ * ninguna pasada corre mientras borra. Las entradas del outbox de ese reporte y
+ * de sus visitas (que llevan el mismo `reporteId`) se retiran antes del DELETE
+ * remoto (así ningún upsert pendiente puede "resucitarlo") y se restauran si el
+ * borrado falla.
  *
  * Si el reporte solo existe en este celular (nunca llegó al servidor), se
  * descarta localmente. Sus visitas locales se borran con él (en el servidor,

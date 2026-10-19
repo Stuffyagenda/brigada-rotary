@@ -2,20 +2,31 @@
 
 /**
  * Lista de reportes guardados en este celular: filas planas con divisor,
- * búsqueda local y accesos a la ficha ("Ver en mapa") y a la edición.
+ * búsqueda local, filtro rápido por vigencia y accesos a la ficha ("Ver en
+ * mapa") y a la edición. La vigencia se recalcula con `useAhora()`.
  */
 import { CloudCheck, CloudOff, Map as MapIcon, Pencil, Search } from "lucide-react";
 import Link from "next/link";
-import { useDeferredValue, useId, useState } from "react";
+import { useDeferredValue, useId, useMemo, useState } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { GlifoEstado } from "@/components/map/Filters";
+import { GlifoVigencia } from "@/components/map/GlifoVigencia";
+import { alternar, contarPorVigencia } from "@/components/map/url-state";
 import { formatoTelefono, haceCuanto, fechaLarga, plusCodeDe, tituloReporte } from "@/components/sheet/format";
 import { SyncIndicator } from "@/components/sync/SyncIndicator";
+import { Chip } from "@/components/ui/Chip";
+import { useAhora } from "@/hooks/useAhora";
 import { useReportes } from "@/hooks/useReportes";
 import type { ReporteLocal } from "@/lib/db";
 import { cn } from "@/lib/cn";
-import { ESTADO_LABEL } from "@/lib/types";
-import { buscarRegistros } from "./buscar";
+import type { Vigencia } from "@/lib/types";
+import {
+  formatearFechaLarga,
+  vigencia as vigenciaDe,
+  VIGENCIA_DESCRIPCION,
+  VIGENCIA_LABEL,
+  VIGENCIAS,
+} from "@/lib/vigencia";
+import { buscarRegistros, textoVigencia } from "./buscar";
 
 const accion =
   "inline-flex min-h-11 items-center gap-2 rounded-lg border border-line bg-white px-3.5 font-semibold " +
@@ -25,9 +36,20 @@ export function RegistrosScreen() {
   const idBuscar = useId();
   const [consulta, setConsulta] = useState("");
   const q = useDeferredValue(consulta);
+  const [filtroVigencia, setFiltroVigencia] = useState<Vigencia[]>([]);
+  const ahora = useAhora();
   const { reportes, loading } = useReportes();
-  const lista = buscarRegistros(reportes, q);
+  const encontrados = useMemo(() => buscarRegistros(reportes, q, ahora), [reportes, q, ahora]);
+  const conteo = useMemo(() => contarPorVigencia(encontrados, ahora), [encontrados, ahora]);
+  const lista = useMemo(
+    () =>
+      filtroVigencia.length
+        ? encontrados.filter((r) => filtroVigencia.includes(vigenciaDe(r, ahora)))
+        : encontrados,
+    [encontrados, filtroVigencia, ahora],
+  );
   const sinEnviar = reportes.filter((r) => r._sync !== "synced").length;
+  const filtrando = q.trim() !== "" || filtroVigencia.length > 0;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col bg-paper">
@@ -67,6 +89,30 @@ export function RegistrosScreen() {
             className="h-12 w-full rounded-xl border border-line bg-white pr-3 pl-11 text-base placeholder:text-ink-soft focus-visible:border-ink"
           />
         </div>
+        {!loading && reportes.length > 0 && (
+          <div
+            role="group"
+            aria-label="Filtrar por vigencia de la atención"
+            className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
+          >
+            {VIGENCIAS.map((v) => (
+              <Chip
+                key={v}
+                pressed={filtroVigencia.includes(v)}
+                onPressedChange={() => setFiltroVigencia((f) => alternar(f, v))}
+                title={VIGENCIA_DESCRIPCION[v]}
+                className="shrink-0 gap-2 pr-3 pl-2.5"
+              >
+                <GlifoVigencia vigencia={v} />
+                <span>
+                  {VIGENCIA_LABEL[v]}
+                  {v !== "pendiente" && <span className="sr-only">: {VIGENCIA_DESCRIPCION[v]}</span>}
+                </span>
+                <span className="font-stamp text-lg leading-none">{conteo[v]}</span>
+              </Chip>
+            ))}
+          </div>
+        )}
       </header>
 
       <main id="contenido" className="flex-1 px-4 pb-10 sm:px-6">
@@ -77,19 +123,31 @@ export function RegistrosScreen() {
           </div>
         ) : lista.length === 0 ? (
           <div className="py-10" role="status">
-            <p className="text-lg font-bold">Ningún reporte coincide con “{q.trim()}”.</p>
-            <p className="text-ink-soft">Prueba con parte del nombre, los últimos dígitos del teléfono o el Plus Code.</p>
+            {q.trim() ? (
+              <>
+                <p className="text-lg font-bold">Ningún reporte coincide con “{q.trim()}”.</p>
+                <p className="text-ink-soft">
+                  Prueba con parte del nombre, los últimos dígitos del teléfono o el Plus Code
+                  {filtroVigencia.length > 0 && ", o quita el filtro de vigencia"}.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-bold">Ningún reporte con esa vigencia.</p>
+                <p className="text-ink-soft">Quita el filtro para ver todos los reportes.</p>
+              </>
+            )}
           </div>
         ) : (
           <>
-            {q.trim() && (
+            {filtrando && (
               <p role="status" className="pt-4 text-sm text-ink-soft">
                 {lista.length === 1 ? "1 resultado" : `${lista.length} resultados`}
               </p>
             )}
             <ul className="divide-y divide-line">
               {lista.map((r) => (
-                <Fila key={r.id} reporte={r} />
+                <Fila key={r.id} reporte={r} ahora={ahora} />
               ))}
             </ul>
           </>
@@ -99,20 +157,24 @@ export function RegistrosScreen() {
   );
 }
 
-function Fila({ reporte: r }: { reporte: ReporteLocal }) {
+function Fila({ reporte: r, ahora }: { reporte: ReporteLocal; ahora: Date }) {
   const telefono = formatoTelefono(r.contacto_telefono);
   const plusCode = plusCodeDe(r);
-  const actualizado = haceCuanto(r.updated_at);
+  const actualizado = haceCuanto(r.updated_at, ahora);
   const sincronizado = r._sync === "synced";
+  const vig = vigenciaDe(r, ahora);
   return (
     <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="min-w-0 flex-1">
         <h2 className="text-lg font-bold break-words">{tituloReporte(r)}</h2>
         <p className={cn(!telefono && "text-ink-soft")}>{telefono ?? "Sin teléfono"}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <span className="inline-flex items-center gap-1.5 font-semibold">
-            <GlifoEstado estado={r.estado} className="size-3" />
-            {ESTADO_LABEL[r.estado]}
+          <span className="inline-flex items-center gap-1.5 font-semibold" data-testid="fila-vigencia">
+            <GlifoVigencia vigencia={vig} tamano="sm" />
+            <span>
+              {textoVigencia(r, ahora)}
+              {vig === "vencido" && <span className="font-normal">, necesita nueva visita</span>}
+            </span>
           </span>
           <span className={cn("inline-flex items-center gap-1.5", sincronizado ? "text-ink-soft" : "font-semibold")}>
             {sincronizado ? (
@@ -124,6 +186,11 @@ function Fila({ reporte: r }: { reporte: ReporteLocal }) {
           </span>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
+          {r.fecha_reporte && (
+            <span className="block">
+              Reporte del <time dateTime={r.fecha_reporte}>{formatearFechaLarga(r.fecha_reporte)}</time>
+            </span>
+          )}
           {plusCode && <span className="block">Plus Code {plusCode}</span>}
           {actualizado && (
             <span className="block">

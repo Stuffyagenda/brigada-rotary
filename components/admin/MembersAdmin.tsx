@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Info, RotateCw } from "lucide-react";
+import { ArrowLeft, Info, PencilLine, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import {
   type MiembroCambio,
 } from "@/components/admin/members-data";
 import { Switch } from "@/components/admin/Switch";
+import { DatosPersonalesDialog } from "@/components/auth/DatosPersonalesDialog";
 import { Button } from "@/components/ui/Button";
 import { useProfile } from "@/lib/auth/profile";
 import { cn } from "@/lib/cn";
@@ -58,19 +59,36 @@ interface FilaProps {
   esYo: boolean;
   guardando: boolean;
   onCambio: (miembro: Miembro, cambio: MiembroCambio) => void;
+  onEditarNombre: (miembro: Miembro) => void;
 }
 
-function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio }: FilaProps) {
+function FilaMiembro({ miembro, clubs, esYo, guardando, onCambio, onEditarNombre }: FilaProps) {
   const id = useId();
   const nombre = nombreVisible(miembro);
+  const sinNombre = nombre === "Sin nombre";
   const clubActual = clubs.find((c) => c.id === miembro.club_id);
 
   return (
     <li aria-busy={guardando || undefined} className="py-4">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
-        <p className={cn("font-semibold", !miembro.nombre_completo?.trim() && "text-ink-soft")}>{nombre}</p>
-        {esYo && <span className="text-sm text-ink-soft">(tú)</span>}
-        {!miembro.activo && <span className="text-sm font-semibold text-pending">Sin acceso</span>}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 pt-2">
+          <p className={cn("font-semibold break-words", sinNombre && "text-ink-soft")}>{nombre}</p>
+          {esYo && <span className="text-sm text-ink-soft">(tú)</span>}
+          {!sinNombre && !miembro.apellido?.trim() && (
+            <span className="text-sm text-ink-soft">Sin apellido</span>
+          )}
+          {!miembro.activo && <span className="text-sm font-semibold text-pending">Sin acceso</span>}
+        </div>
+        <Button
+          variant="ghost"
+          disabled={guardando}
+          onClick={() => onEditarNombre(miembro)}
+          aria-label={`Editar nombre de ${nombre}`}
+          className="-mr-2 shrink-0 px-3 text-rotary"
+        >
+          <PencilLine aria-hidden="true" size={18} />
+          <span aria-hidden="true">Editar nombre</span>
+        </Button>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
         <div className="flex flex-col gap-1">
@@ -132,6 +150,9 @@ export function MembersAdmin() {
   // El contenido se conserva al cerrar para que no se vacíe durante la animación de salida.
   const [dialogo, setDialogo] = useState<Dialogo | null>(null);
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  // Miembro cuyo nombre se edita (se conserva al cerrar, igual que `dialogo`).
+  const [editado, setEditado] = useState<Miembro | null>(null);
+  const [editandoNombre, setEditandoNombre] = useState(false);
 
   const cargar = useCallback(async () => {
     setCarga({ estado: "cargando" });
@@ -184,6 +205,22 @@ export function MembersAdmin() {
           return n;
         });
       }
+    },
+    [reemplazar, refreshProfile, selfId],
+  );
+
+  /** Guarda nombre y apellido desde el diálogo (sin optimismo: el diálogo espera). */
+  const guardarNombre = useCallback(
+    async (miembro: Miembro, cambio: Pick<MiembroCambio, "nombre" | "apellido">, clubs: readonly ClubOpcion[]) => {
+      let fila: Miembro;
+      try {
+        fila = await actualizarMiembro(getSupabaseBrowserClient(), miembro.id, cambio);
+      } catch (error) {
+        throw new Error(adminErrorMessage(error));
+      }
+      reemplazar(fila);
+      toast.success(avisoGuardado(fila, cambio, clubs));
+      if (fila.id === selfId) void refreshProfile();
     },
     [reemplazar, refreshProfile, selfId],
   );
@@ -247,7 +284,10 @@ export function MembersAdmin() {
 
       <p className="mb-2 flex gap-2 rounded-lg bg-white px-3 py-2.5 text-sm text-ink-soft ring-1 ring-line">
         <Info aria-hidden="true" size={18} className="mt-px shrink-0" />
-        <span>Para crear usuarios, usa Authentication → Users en el panel de Supabase.</span>
+        <span>
+          Cada persona crea su cuenta en la pantalla de registro y entra con acceso activo. Aquí puedes corregir su
+          nombre, cambiar su club o su rol, o desactivar su acceso.
+        </span>
       </p>
 
       {carga.estado === "cargando" && (
@@ -279,6 +319,10 @@ export function MembersAdmin() {
                 esYo={m.id === selfId}
                 guardando={guardando.has(m.id)}
                 onCambio={(miembro, cambio) => onCambio(miembro, cambio, carga.clubs)}
+                onEditarNombre={(miembro) => {
+                  setEditado(miembro);
+                  setEditandoNombre(true);
+                }}
               />
             ))}
           </ul>
@@ -292,6 +336,18 @@ export function MembersAdmin() {
         confirmLabel={dialogo?.confirmLabel}
         onConfirm={dialogo?.onConfirm}
       />
+
+      {editado && carga.estado === "listo" && (
+        <DatosPersonalesDialog
+          open={editandoNombre}
+          onOpenChange={setEditandoNombre}
+          title={editado.id === selfId ? "Editar mis datos" : `Editar nombre de ${nombreVisible(editado)}`}
+          description="Nombre y apellido tal como se mostrarán en la app. Necesitas conexión para guardar."
+          inicial={{ nombre: editado.nombre, apellido: editado.apellido }}
+          propio={editado.id === selfId}
+          onSave={(datos) => guardarNombre(editado, datos, carga.clubs)}
+        />
+      )}
     </main>
   );
 }

@@ -1,23 +1,26 @@
 "use client";
 
-/** Ficha de un reporte dentro del panel: carga el reporte local y monta TriageTag. */
+/**
+ * Ficha de un reporte dentro del panel: carga el reporte local y monta TriageTag.
+ * Los reportes no se borran desde la app: solo se editan.
+ */
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { useReporte } from "@/hooks/useReportes";
-import { deleteReport } from "@/lib/sync";
+import type { Vigencia } from "@/lib/types";
 import { TriageTag } from "./TriageTag";
 
 export interface FichaPanelProps {
   id: string;
   nombresClub: Map<string, string>;
-  isAdmin: boolean;
-  animarAtendido: boolean;
+  /** Vigencia anterior para el momento orquestado (franja y sello), o `null`. */
+  animarDesde: Vigencia | null;
+  /** Referencia de la vigencia (la de `useAhora()`). */
+  ahora: Date;
   onCerrar: () => void;
   onEditar: () => void;
-  /** Tras borrar: cerrar la ficha. */
-  onBorrado: () => void;
+  onRegistrarVisita: () => void;
   /** Acciones dentro de la ficha (escritorio); en el móvil van en el pie del panel. */
   conAcciones?: boolean;
 }
@@ -25,11 +28,11 @@ export interface FichaPanelProps {
 export function FichaPanel({
   id,
   nombresClub,
-  isAdmin,
-  animarAtendido,
+  animarDesde,
+  ahora,
   onCerrar,
   onEditar,
-  onBorrado,
+  onRegistrarVisita,
   conAcciones = true,
 }: FichaPanelProps) {
   const { reporte, loading } = useReporte(id);
@@ -64,7 +67,7 @@ export function FichaPanel({
           {cerrar}
         </div>
         <p className="text-ink-soft">
-          Puede que lo hayan borrado o que aún no se haya descargado. Con conexión, los reportes se descargan solos.
+          Puede que aún no se haya descargado. Con conexión, los reportes se descargan solos.
         </p>
         <Button variant="secondary" onClick={onCerrar}>
           Volver al mapa
@@ -84,15 +87,11 @@ export function FichaPanel({
         clubNombre={reporte.club_id ? nombresClub.get(reporte.club_id) : null}
         onEditar={onEditar}
         onRegistrarEntrega={onEditar}
-        animarAtendido={animarAtendido}
+        onRegistrarVisita={onRegistrarVisita}
+        animarDesde={animarDesde}
+        ahora={ahora}
         tituloRef={tituloRef}
         conAcciones={conAcciones}
-        puedeBorrar={isAdmin}
-        onBorrar={async () => {
-          await deleteReport(reporte.id);
-          onBorrado();
-          toast("Reporte borrado");
-        }}
       />
     </div>
   );

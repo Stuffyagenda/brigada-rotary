@@ -1,10 +1,11 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { META_ULTIMO_BRIGADISTA } from "@/lib/brigadista";
 import { db, type ReporteLocal } from "@/lib/db";
 import { encodePlusCode } from "@/lib/pluscode";
 import { reporteVacio } from "@/lib/types";
+import { hoyPanama } from "@/lib/vigencia";
 
 const mocks = vi.hoisted(() => ({
   saveReport: vi.fn(),
@@ -427,5 +428,76 @@ describe("ReportForm: cerrar", () => {
       }),
     );
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ReportForm: fecha del reporte", () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  const fechaRelativa = (dias: number) => hoyPanama(new Date(Date.now() + dias * DIA));
+
+  it("al crear, por defecto es hoy (Panamá) y no deja elegir días futuros", () => {
+    montar();
+    const fecha = screen.getByLabelText("Fecha del reporte");
+    expect(fecha).toHaveAttribute("type", "date");
+    expect(fecha).toHaveValue(hoyPanama());
+    expect(fecha).toHaveAttribute("max", hoyPanama());
+  });
+
+  it("al editar muestra la fecha guardada y la envía en el payload", async () => {
+    const guardada = fechaRelativa(-5);
+    mocks.useReporte.mockReturnValue({ reporte: reporteGuardado({ fecha_reporte: guardada }), loading: false });
+    const { user } = montar({ reporteId: ID });
+    expect(screen.getByLabelText("Fecha del reporte")).toHaveValue(guardada);
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mocks.saveReport).toHaveBeenCalledOnce());
+    expect(mocks.saveReport.mock.calls[0][0].fecha_reporte).toBe(guardada);
+  });
+
+  it("una fecha futura no se guarda: mensaje junto al campo y foco en él", async () => {
+    const { user } = montar();
+    const fecha = screen.getByLabelText("Fecha del reporte");
+    fireEvent.change(fecha, { target: { value: fechaRelativa(2) } });
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    expect(fecha).toHaveAttribute("aria-invalid", "true");
+    expect(fecha).toHaveAccessibleDescription("La fecha del reporte no puede ser futura.");
+    await waitFor(() => expect(fecha).toHaveFocus());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(mocks.saveReport).not.toHaveBeenCalled();
+
+    // Al corregirla desaparece el error y se puede guardar.
+    fireEvent.change(fecha, { target: { value: fechaRelativa(-1) } });
+    expect(fecha).not.toHaveAttribute("aria-invalid");
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mocks.saveReport).toHaveBeenCalledOnce());
+    expect(mocks.saveReport.mock.calls[0][0].fecha_reporte).toBe(fechaRelativa(-1));
+  });
+
+  it("una fecha vacía o inválida muestra un error en español", async () => {
+    const { user } = montar();
+    const fecha = screen.getByLabelText("Fecha del reporte");
+    fireEvent.change(fecha, { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    expect(fecha).toHaveAccessibleDescription("Escribe una fecha válida.");
+    expect(mocks.saveReport).not.toHaveBeenCalled();
+  });
+
+  it("cambiar la fecha cuenta como cambio del formulario y al cerrar pide descartar", async () => {
+    mocks.useReporte.mockReturnValue({ reporte: reporteGuardado(), loading: false });
+    const onDirtyChange = vi.fn();
+    const { user, onClose } = montar({ reporteId: ID, onDirtyChange });
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    fireEvent.change(screen.getByLabelText("Fecha del reporte"), { target: { value: fechaRelativa(-3) } });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("¿Estás seguro de realizar los cambios del formulario?");
+    await user.click(within(dialogo).getByRole("button", { name: "Seguir editando" }));
+
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(await screen.findByRole("alertdialog", { name: "¿Descartar los cambios?" })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

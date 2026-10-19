@@ -4,7 +4,7 @@
  */
 import type { ReporteLocal } from "@/lib/db";
 import { encodePlusCode } from "@/lib/pluscode";
-import { INSUMOS } from "@/lib/types";
+import { INSUMOS, type EntregaColumna } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Teléfono
@@ -154,8 +154,8 @@ export function listaNecesidades(r: ReporteLocal): string[] {
   ];
 }
 
-/** Entregas registradas: insumos (`ent_*`) y otros, con mayúscula inicial. */
-export function listaEntregas(r: ReporteLocal): string[] {
+/** Entregas registradas (de un reporte o una visita): insumos (`ent_*`) y otros, con mayúscula inicial. */
+export function listaEntregas(r: Pick<ReporteLocal, EntregaColumna | "ent_otros">): string[] {
   return [
     ...INSUMOS.filter((i) => r[i.entColumna]).map((i) => capitalizar(i.corto)),
     ...(r.ent_otros ?? []).filter(Boolean),

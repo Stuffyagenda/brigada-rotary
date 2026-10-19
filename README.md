@@ -91,7 +91,9 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 - **Confirm email** (Authentication → Sign In / Providers → Email):
   - activado: `signUp` no devuelve sesión; el usuario recibe un correo de confirmación y luego inicia sesión. El perfil se crea igualmente al registrarse (el trigger corre al insertar en `auth.users`);
   - desactivado: `signUp` devuelve la sesión y la app entra directamente.
-- Con "Confirm email" activado, añadir el dominio de la app a Site URL / Redirect URLs (Authentication → URL Configuration) para que el enlace del correo vuelva a la app.
+- Con "Confirm email" activado, añadir el dominio de la app a Site URL / Redirect URLs (Authentication → URL Configuration) para que el enlace del correo vuelva a la app: la app pide `emailRedirectTo = <origen>/login`. Si el dominio no está en la lista, Supabase usa la Site URL; la cuenta queda confirmada igual y la persona inicia sesión.
+- Con "Confirm email" activado y el SMTP por defecto de Supabase, solo se envían unos pocos correos por hora (error `over_email_send_rate_limit`); para una brigada grande, configurar un SMTP propio (Authentication → Emails → SMTP Settings).
+- Si un correo ya registrado se vuelve a registrar con "Confirm email" activado, Supabase no devuelve error (para no revelar cuentas) sino un usuario sin `identities`; la app lo trata como "Ya existe una cuenta con ese correo".
 
 ## Scripts
 
@@ -119,7 +121,7 @@ app/
   (app)/                Rutas con sesión: mapa (/), registros, miembros
 components/
   ui/                   Primitivas: Button, YesNo, Counter, Chip, HoldToDelete
-  map/ sheet/ form/     Mapa, ficha de triaje y panel, formulario de reporte
+  map/ sheet/ form/     Mapa, ficha de triaje y panel, formularios de reporte y de visita
   sync/                 SyncProvider (arranca el motor) y SyncIndicator
   pwa/                  Registro del service worker e InstallButton
 hooks/
@@ -150,9 +152,11 @@ e2e/                    Tests Playwright
 
 | Ruta | Contenido |
 |---|---|
-| `/` | Mapa (Leaflet, capas Calles y Satélite) con buscador de comunidad o Plus Code, Mi ubicación, Elegir en el mapa, filtros (estado, prioridad, necesidad, club) y panel: resumen de la zona, ficha de triaje o formulario. En móvil el panel es un Vaul con tres posiciones; desde 1024 px, una columna fija de 420 px |
-| `/registros` | Reportes guardados en el celular, con búsqueda local (contacto, teléfono, brigadista, estado, Plus Code o id), estado de sincronización, "Ver en mapa" y "Editar" |
-| `/miembros` | Solo admin activo (enlace en el menú de cuenta): lista de miembros con su club, rol y acceso activo/desactivado. Un admin no puede quitarse el rol ni desactivarse a sí mismo |
+| `/` | Mapa (Leaflet, capas Calles y Satélite) con buscador de comunidad o Plus Code, Mi ubicación, Elegir en el mapa, filtros (vigencia, prioridad, necesidad, club) y panel: resumen de la zona, ficha de triaje, formulario del reporte o formulario de nueva visita. En móvil el panel es un Vaul con tres posiciones; desde 1024 px, una columna fija de 420 px |
+| `/login` | Inicio de sesión con correo y contraseña; enlace "¿No tienes cuenta? Crear cuenta" |
+| `/registro` | Pública y estática: crear cuenta con nombre, apellido, club (lista de `clubs_publicos()`, agrupada en Rotary/Rotaract), correo y contraseña (mín. 8). Con sesión redirige a `/`. Necesita conexión |
+| `/registros` | Reportes guardados en el celular, con fecha del reporte, vigencia ("Pendiente", "Atendido hace N días"), búsqueda local (contacto, teléfono, brigadista, estado, vigencia, fecha del reporte en texto, Plus Code o id), filtro rápido por vigencia, estado de sincronización, "Ver en mapa" y "Editar" |
+| `/miembros` | Solo admin activo (enlace en el menú de cuenta): lista de miembros con nombre y apellido, club, rol y acceso activo/desactivado. El admin corrige nombre y apellido de cualquiera ("Editar nombre"). Un admin no puede quitarse el rol ni desactivarse a sí mismo |
 
 Estado del mapa en la URL (se actualiza con `history.pushState`/`replaceState`, sin pedir nada al servidor):
 
@@ -161,7 +165,11 @@ Estado del mapa en la URL (se actualiza con `history.pushState`/`replaceState`, 
 | `reporte=<id>` | Abre la ficha del reporte |
 | `reporte=nuevo` | Abre el formulario de un reporte nuevo |
 | `reporte=<id>&editar=1` | Abre el formulario de edición |
-| `estado`, `prioridad`, `necesidad`, `club` | Filtros, con valores separados por comas (`estado=PENDIENTE&necesidad=agua,otros`) |
+| `reporte=<id>&visita=1` | Abre el formulario de nueva visita (al guardar o cerrar vuelve a `reporte=<id>`) |
+| `vigencia`, `prioridad`, `necesidad`, `club` | Filtros, con valores separados por comas (`vigencia=pendiente,vencido&necesidad=agua,otros`). `vigencia` admite `pendiente`, `reciente`, `por-vencer` y `vencido` |
+| `estado` | Alias antiguo de `vigencia`, para enlaces viejos: `PENDIENTE` = `pendiente`; `ATENDIDO` = `reciente,por-vencer,vencido`. Al cambiar un filtro se reescribe como `vigencia` |
+
+Ficha de triaje (`components/sheet/TriageTag.tsx`): la franja y el sello toman el color de la vigencia (sello `PENDIENTE`, `ATENDIDO`, `ATENDIDO` con "hace N días" debajo, o `REVISITAR`), con "Atendido hace N días", "Necesita nueva visita" si está vencido y "Reporte del <fecha>". La sección "Visitas" lista el historial (`useVisitas`), de la más reciente a la más antigua, y la "Atención inicial" cuando la atención del reporte no la sustituyó una visita. Acciones: en PENDIENTE, "Registrar entrega" (edita el reporte); en ATENDIDO, siempre "Registrar nueva visita", que es la acción principal si está vencido, secundaria destacada (borde naranja) si está por vencer y secundaria si es reciente. Los reportes no se borran desde la app: solo se editan.
 
 El buscador del mapa solo resuelve Plus Codes y comunidades (`lib/geocode.ts`); los nombres y teléfonos se buscan únicamente en `/registros`, sin salir del celular. Como el último paso del buscador es Nominatim (servicio externo), `geocode()` no lo consulta si el término parece un dato personal: 6 o más dígitos (teléfono), un `@` (correo) o el nombre de un contacto de los reportes locales (opción `excluir`).
 
@@ -181,12 +189,13 @@ La búsqueda de `/registros` (`components/registros/buscar.ts` sobre `filtrarRep
 - Los días son de calendario en Panamá entre `attended_at` y hoy (`diasDesdeAtencion`). Una visita nueva actualiza `attended_at` del reporte, así que la vigencia cuenta desde la última visita.
 - `filtrarReportes(reportes, { vigencia: [...] }, ahora)` filtra por vigencia; `useReportes(filtros, ahora)` recibe la hora de `useAhora()` para recalcularla al pasar el tiempo.
 - Un ATENDIDO sin `attended_at` (lo impide el check del SQL) cuenta como `vencido`.
+- En la interfaz (mapa, ficha, resumen y `/registros`) la vigencia se calcula con `useAhora()`: se renueva cada 10 minutos y al volver a la app, así un caso pasa solo de verde a naranja y a negro. Nunca solo color: cada vigencia tiene su forma de pin y de glifo (`components/map/pin-estilo.ts`, `GlifoVigencia`): pendiente círculo relleno rojo; reciente anillo verde; por vencer anillo naranja grueso con punto central; vencido rombo negro con borde blanco (`RomboMarker`, un `CircleMarker` que se dibuja como rombo en el SVG del mapa). Los pines más urgentes se dibujan encima. El resumen del panel destaca "N familias necesitan nueva visita".
 
 ## Visitas (datos locales y sync)
 
 - Dexie v2 (`lib/db.ts`): tabla `visitas` (`id, reporte_id, fecha, _sync`) con `VisitaLocal = Visita & { _sync }`. La migración local desde la v1 rellena `fecha_reporte` (fecha de `created_at` en Panamá) en los reportes y en los upsert pendientes de la cola.
 - `saveVisita(input)` valida con `visitaSchema` (fecha no futura; al menos una entrega u observación), guarda la visita como `pending` y, en la misma transacción, actualiza el reporte por la ruta de `saveReport`: `estado = 'ATENDIDO'`, `attended_at = visitado_at` (la fecha de la visita con la hora actual de Panamá), `ent_*`/`ent_otros`/`observaciones_atencion` de la visita. Una visita con fecha anterior a la última atención entra al historial sin retroceder el reporte.
-- Cola: las entradas del `outbox` tienen `entidad` (`"reporte"` | `"visita"`; ausente = reporte, entradas de la v1). Las de visita llevan `reporteId` (de su reporte), `visitaId` y `visitaPayload`. El envío de visitas y su pull/Realtime están pendientes: hoy `pushOutbox` deja intactas las entradas de visita (`TODO(sync-visitas)` en `lib/sync`).
+- Cola: las entradas del `outbox` tienen `entidad` (`"reporte"` | `"visita"`; ausente = reporte, entradas de la v1). Las de visita llevan `reporteId` (de su reporte), `visitaId` y `visitaPayload`. `saveVisita` encola la visita detrás del upsert del reporte y el motor la envía siempre después de él (ver "Funcionamiento offline y sincronización").
 - `deleteReport` borra también las visitas locales del reporte; `limpiarEspejoLocal` borra las visitas sincronizadas.
 
 ## Roles y permisos
@@ -215,8 +224,14 @@ Los permisos se aplican en Postgres con Row Level Security; la UI solo oculta lo
 
 ## Autenticación
 
-- **Login:** `/login` con correo y contraseña (`signInWithPassword`). Sin magic link. Registro abierto en `/registro` (ver "Registro abierto (Auth)"). Tras entrar vuelve a `?next=` si es una ruta interna (`lib/auth/redirect.ts`).
-- **Proxy (`proxy.ts`, Next 16):** refresca la sesión de `@supabase/ssr` en las cookies y redirige a `/login` las navegaciones `GET` sin sesión. Excluye `_next`, `/icons`, `/sw.js`, el manifiesto y los archivos con extensión. Si Supabase no responde, deja pasar.
+- **Login:** `/login` con correo y contraseña (`signInWithPassword`). Sin magic link. Tras entrar vuelve a `?next=` si es una ruta interna (`lib/auth/redirect.ts`).
+- **Registro:** `/registro` (`components/auth/RegistroForm.tsx`, ver "Registro abierto (Auth)" para la configuración de Supabase). Página estática; en el cliente carga la lista de clubes con `rpc('clubs_publicos')` (sin red: "Necesitas conexión para crear una cuenta." y "Reintentar"; también reintenta sola al volver la señal). Valida en el cliente (`lib/auth/registro.ts`: nombre y apellido obligatorios hasta 120 caracteres, club, correo, contraseña de 8 a 72 caracteres y repetición) con el error junto a cada campo y el foco en el primero. Luego llama a `supabase.auth.signUp({ email, password, options: { data: { nombre, apellido, club_id }, emailRedirectTo: <origen>/login } })`:
+  - con sesión (Confirm email desactivado) → `router.replace('/')` (o el `?next=` interno);
+  - sin sesión (Confirm email activado) → aviso "Te enviamos un correo para confirmar tu cuenta. Ábrelo y luego inicia sesión." con enlace a `/login`;
+  - errores traducidos en `signUpErrorMessage` (`lib/auth/errors.ts`) a partir de los códigos de Supabase Auth: `user_already_exists`/`email_exists` (y, con Confirm email, el usuario devuelto sin `identities`) → "Ya existe una cuenta con ese correo. Inicia sesión."; `weak_password` (con `reasons: ['pwned']`, contraseña filtrada); `signup_disabled`/`email_provider_disabled` → "El registro está desactivado. Pide a un administrador que lo active."; `email_address_invalid`, `email_address_not_authorized`, `over_email_send_rate_limit`, `over_request_rate_limit` y falta de red.
+  - `/login` y `/registro` se enlazan entre sí conservando el `?next=` interno.
+- **Mis datos:** en el menú de cuenta, "Editar mis datos" abre un diálogo (Radix Dialog) que actualiza `profiles.nombre` y `profiles.apellido` del propio usuario (RLS "cada uno edita el suyo"; el trigger `protect_profile_fields` recalcula `nombre_completo`) y refresca el perfil. Necesita conexión. El menú y `/miembros` muestran "Nombre Apellido" (`nombreCompletoDe` en `lib/auth/nombre.ts`; en perfiles antiguos sin esas columnas, `nombre_completo`).
+- **Proxy (`proxy.ts`, Next 16):** refresca la sesión de `@supabase/ssr` en las cookies y redirige a `/login` las navegaciones `GET` sin sesión. `/login` y `/registro` son públicas; con sesión, ambas redirigen a `/` (o al `?next=` interno). `/registros` sigue protegida. Excluye `_next`, `/icons`, `/sw.js`, el manifiesto y los archivos con extensión. Si Supabase no responde, deja pasar.
 - **Guard del cliente (`components/auth/SessionGate.tsx`, layout `(app)`):** comprobación definitiva. Sin sesión → `/login`; perfil con `activo = false` → pantalla de acceso desactivado con "Cerrar sesión".
 - **Offline:** `ProfileProvider` (`lib/auth/profile.tsx`) lee la sesión local con `auth.getSession()` y guarda el perfil y su club en Dexie (`meta`, clave `perfil`). Si no hay señal y la sesión guardada no se puede refrescar, usa la caché (`offline: true`) y deja pasar; solo trata como "sin sesión" cuando no hay sesión local. Cerrar sesión borra la caché del perfil y, con `limpiarEspejoLocal()` (`lib/sync`), la copia local de los reportes ya sincronizados (`_sync: 'synced'` sin entradas en la cola), para no dejar datos personales de las familias en un celular compartido; también olvida el último brigadista escrito y la fecha del último sync. Nunca borra la cola (`outbox`) ni los reportes pendientes o con error: se envían cuando alguien vuelve a iniciar sesión. Al volver a entrar, el pull descarga de nuevo los reportes.
 
@@ -230,17 +245,20 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   - Con foto nueva, la ruta en Storage (`{reporteId}/{uuid}.jpg`) se fija en `foto_path` al guardar, y los guardados posteriores la heredan. La foto comprimida viaja como `Blob` en la entrada del `outbox`.
   - **Colapso:** si el reporte ya tenía un `upsert` pendiente, se reemplaza en su sitio de la cola. Si no llega foto nueva, se conserva la pendiente.
   - Con señal, intenta enviarlo enseguida (hasta 8 s) y devuelve `synced` solo si el servidor confirmó la fila; si no, `pending`.
+  - **Visitas:** `saveVisita(input)` guarda la visita y actualiza el reporte en una sola transacción, y encola primero el upsert del reporte y después el de la visita (`entidad: 'visita'`, `seq` mayor). Varios guardados de la misma visita quedan en una entrada (en su sitio si sigue detrás de las del reporte; si no, al final de la cola). Devuelve `synced` solo si el servidor confirmó el reporte y la visita.
   - **Brigadista recordado** (`lib/brigadista.ts`): si al guardar el brigadista escrito es distinto del nombre del perfil, se guarda en `meta` (`ultimoBrigadista`) y es el valor inicial de los reportes nuevos (prioridad: último escrito > nombre del perfil). Escribir de nuevo el nombre del perfil lo olvida; al editar un reporte solo cuenta si se cambió el campo.
 - **Envío (push),** por cada entrada del `outbox` en orden:
   1. Sube la foto a `fotos-viviendas/<foto_path>` con `upsert: false` (si el archivo ya existe por un reintento, cuenta como subido) y quita el `Blob` de la entrada.
   2. `upsert(..., { onConflict: 'id' }).select().single()`. No se envían `total_personas`, `created_by`, `updated_by` ni `updated_at`: en el INSERT `updated_at` toma el `default now()` y en el UPDATE lo fija el trigger `set_reporte_audit` (no depende del reloj del celular). `created_at` sí se envía (hora real del registro en campo, aunque se sincronice horas después); en un UPDATE el trigger conserva el original.
   3. Con la fila devuelta, el reporte local pasa a `synced` y la entrada sale de la cola. Si el reporte se editó durante el envío, la entrada se conserva y se envía en la pasada siguiente.
+
+  Las entradas de visita van en el mismo orden de `seq`, pero una visita solo se envía si no queda en la cola ninguna entrada anterior de su reporte (pendiente, en espera o rechazada): la FK `visitas.reporte_id` exige que el reporte exista en el servidor. Se envía con `from('visitas').upsert(payload, { onConflict: 'id' }).select().single()` (sin `created_by`, que fija el trigger `set_visita_audit`) y, con la fila devuelta, la visita local pasa a `synced`. Si el servidor responde `23503` (el reporte ya no existe, p. ej. lo borró un admin), la visita queda `_sync: 'error'` con un mensaje claro.
 - **Errores** (`clasificarError` en `lib/sync/errors.ts`). `postgrest-js` devuelve el status HTTP en la respuesta (`{ data, error, status }`), no dentro de `error`; el motor lo añade al error (`conStatus`) antes de clasificarlo, y además clasifica por el código SQLSTATE/PostgREST:
 
   | Tipo | Ejemplos | Qué pasa |
   |---|---|---|
   | Red | sin señal, `TypeError` de `fetch`, status 0, tiempo agotado, 5xx, 408, 429 | El reporte sigue `pending`. Suben `intentos` y `lastError`, y se reintenta solo con backoff (5 s, 10 s… hasta 5 min). La pasada se corta |
-  | Rechazo | SQLSTATE de clase 22, 23 o 42 (p. ej. RLS `42501`, check `23514`, FK `23503`), `PGRST1xx`/`PGRST2xx`, otros 4xx | El reporte queda `_sync: 'error'` y la entrada no se reintenta sola. La pasada sigue con la siguiente entrada y hace el pull. Se reintenta con "Sincronizar ahora" o al volver a guardar |
+  | Rechazo | SQLSTATE de clase 22, 23 o 42 (p. ej. RLS `42501`, check `23514`, FK `23503`), `PGRST1xx`/`PGRST2xx`, otros 4xx | El reporte (o la visita) queda `_sync: 'error'` y la entrada no se reintenta sola; las visitas de un reporte rechazado esperan en la cola sin enviarse. La pasada sigue con la siguiente entrada y hace el pull. Se reintenta con "Sincronizar ahora" o al volver a guardar |
   | Sesión | sin sesión, JWT vencido (401, `PGRST30x`, "JWT expired") | No se borra nada: la cola se conserva y `lastError` pide iniciar sesión |
 
 - **Descarga (pull):** después de un push sin cortes, se hace un `select('*')` paginado de `reportes` y se reconcilia:
@@ -248,7 +266,9 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   - un reporte `synced` local más nuevo (`updated_at`) que el descargado no retrocede (p. ej. si llegó por Realtime durante la descarga);
   - se borran del dispositivo los reportes `synced` que ya no existen en el servidor;
   - nunca se borran reportes pendientes ni con error.
-- **Realtime:** con señal y sesión, hay una suscripción `postgres_changes` a `public.reportes` (requiere `supabase/migrations/002_realtime.sql`). INSERT, UPDATE y DELETE se aplican a Dexie con las mismas reglas. La suscripción se cancela al perder la señal o la sesión.
+
+  Después, un `select('*')` paginado de `visitas` se reconcilia igual, por visita: una visita con entradas en la cola no se pisa, una `synced` más nueva (`visitado_at`, y si coincide `created_at`) no retrocede, las `synced` que ya no están en el servidor se borran y solo se guardan las de reportes que están en el celular. Si el servidor aún no tiene la tabla (`PGRST205`/`42P01`: falta la migración 003), se omiten las visitas sin romper el pull de reportes ni mostrar error al usuario (solo un aviso en la consola de desarrollo).
+- **Realtime:** con señal y sesión, hay una suscripción `postgres_changes` a `public.reportes` (requiere `supabase/migrations/002_realtime.sql`) y otra, en un canal aparte, a `public.visitas` (migración 003; no se abre si el pull detectó que la tabla no existe). INSERT, UPDATE y DELETE se aplican a Dexie con las mismas reglas (una visita con entradas en la cola no se toca). Las suscripciones se cancelan al perder la señal o la sesión.
 - **Disparadores:**
   - al guardar;
   - en el evento `online`;
@@ -257,7 +277,7 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   - con el botón "Sincronizar ahora" (`syncNow()`).
 
   Las pasadas van en una cola (`lib/sync/engine.ts`): nunca hay dos a la vez y una llamada durante una pasada programa una sola pasada más. `ejecutarExclusivo(fn)` encola una operación que corre después de la pasada en curso (y de la ya programada) y antes de cualquier pasada pedida mientras tanto.
-- **Borrado:** `deleteReport(id)` requiere señal (no se encola) y se ejecuta en exclusiva en esa cola: retira del `outbox` las entradas del reporte (así ningún `upsert` pendiente lo "resucita" después del DELETE), ejecuta `delete().eq('id', id).select()` y, si falla, devuelve las entradas a la cola.
+- **Borrado:** `deleteReport(id)` requiere señal (no se encola) y se ejecuta en exclusiva en esa cola: retira del `outbox` las entradas del reporte y de sus visitas (así ningún `upsert` pendiente lo "resucita" después del DELETE), ejecuta `delete().eq('id', id).select()` y, si falla, devuelve las entradas a la cola en su orden. Al confirmarse, borra también las visitas locales del reporte (en el servidor, `on delete cascade`).
   - Si no borra ninguna fila, la RLS lo impidió: "solo un administrador puede hacerlo".
   - Si el reporte solo existía en el dispositivo, se descarta localmente.
   - También se intenta borrar la foto de Storage.
@@ -265,7 +285,7 @@ Código en `lib/sync/` (API pública en `lib/sync/index.ts`). El motor arranca c
   1. la URL `blob:` de la foto pendiente;
   2. una URL firmada de 1 h del bucket privado (en caché de memoria);
   3. la `foto_url` heredada.
-- **Estado:** `useSyncState()` expone `online`, `syncing`, `pendientes` (entradas del `outbox`), `lastError` y `lastSyncAt` (guardado en `meta`). Lo muestra `components/sync/SyncIndicator.tsx`.
+- **Estado:** `useSyncState()` expone `online`, `syncing`, `pendientes` (entradas del `outbox`, de reportes y de visitas), `lastError` y `lastSyncAt` (guardado en `meta`). Lo muestra `components/sync/SyncIndicator.tsx`.
 
 ## Service worker
 

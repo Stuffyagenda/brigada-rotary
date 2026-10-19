@@ -1,5 +1,5 @@
 import { AuthApiError } from "@supabase/supabase-js";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProfileContextValue } from "@/lib/auth/profile";
@@ -14,9 +14,27 @@ vi.mock("next/navigation", () => ({
 
 const signInWithPassword = vi.fn();
 const getSession = vi.fn(async () => ({ data: { session: null }, error: null }));
-vi.mock("@/lib/supabase/client", () => ({
-  getSupabaseBrowserClient: () => ({ auth: { signInWithPassword, getSession } }),
+// `from('profiles').update(cambio).eq('id', id).select('id').maybeSingle()`
+const perfilUpdates: Array<{ id: string; cambio: unknown }> = [];
+let respuestaUpdate: { data: unknown; error: unknown } = { data: { id: "u1" }, error: null };
+const from = vi.fn(() => ({
+  update: (cambio: unknown) => ({
+    eq: (_col: string, id: string) => ({
+      select: () => ({
+        maybeSingle: async () => {
+          perfilUpdates.push({ id, cambio });
+          return respuestaUpdate;
+        },
+      }),
+    }),
+  }),
 }));
+vi.mock("@/lib/supabase/client", () => ({
+  getSupabaseBrowserClient: () => ({ auth: { signInWithPassword, getSession }, from }),
+}));
+
+const toastSuccess = vi.fn();
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
 vi.mock("@/lib/env", () => ({ hasSupabaseEnv: () => true }));
 
@@ -26,6 +44,7 @@ vi.mock("@/lib/auth/profile", () => ({ useProfile: () => perfilActual }));
 const { LoginForm } = await import("@/components/auth/LoginForm");
 const { AccountMenu, initials } = await import("@/components/auth/AccountMenu");
 const { SessionGate, gateView } = await import("@/components/auth/SessionGate");
+const { default: LoginPage } = await import("@/app/(auth)/login/page");
 
 const profile: Profile = {
   id: "u1",
@@ -59,6 +78,9 @@ beforeEach(() => {
   replace.mockReset();
   refresh.mockReset();
   signInWithPassword.mockReset();
+  toastSuccess.mockReset();
+  perfilUpdates.length = 0;
+  respuestaUpdate = { data: { id: "u1" }, error: null };
   perfilActual = perfil();
 });
 
@@ -118,6 +140,23 @@ describe("LoginForm", () => {
     expect(await screen.findByText("Sin conexión. El primer inicio de sesión necesita internet.")).toBeInTheDocument();
     expect(signInWithPassword).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe("LoginPage", () => {
+  it("enlaza a /registro", () => {
+    render(<LoginPage />);
+    expect(screen.getByText("¿No tienes cuenta?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Crear cuenta" })).toHaveAttribute("href", "/registro");
+  });
+
+  it("conserva el next interno al ir a /registro", () => {
+    window.history.replaceState(null, "", "/login?next=%2Fregistros");
+    render(<LoginPage />);
+    expect(screen.getByRole("link", { name: "Crear cuenta" })).toHaveAttribute(
+      "href",
+      "/registro?next=%2Fregistros",
+    );
   });
 });
 
@@ -198,5 +237,72 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     await userEvent.click(screen.getByRole("button", { name: /Cuenta/ }));
     expect(document.body.innerHTML).not.toContain("transition-all");
+  });
+
+  it("muestra nombre y apellido (y el nombre completo de un perfil antiguo)", async () => {
+    perfilActual = perfil({ profile: { ...profile, nombre: "Luis", apellido: "Alain", nombre_completo: "Viejo" } });
+    const { unmount } = render(<AccountMenu />);
+    expect(screen.getByRole("button", { name: "Cuenta: Luis Alain" })).toHaveTextContent("LA");
+    unmount();
+    perfilActual = perfil({ profile: { ...profile, nombre: null, apellido: null, nombre_completo: "Carla Gómez" } });
+    render(<AccountMenu />);
+    expect(screen.getByRole("button", { name: "Cuenta: Carla Gómez" })).toBeInTheDocument();
+  });
+
+  it("edita mis datos, refresca el perfil y devuelve el foco al botón de cuenta", async () => {
+    const refreshPerfil = vi.fn(async () => {});
+    perfilActual = perfil({ refresh: refreshPerfil });
+    render(<AccountMenu />);
+    const trigger = screen.getByRole("button", { name: /Cuenta/ });
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole("button", { name: "Editar mis datos" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Editar mis datos" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const nombre = within(dialogo).getByLabelText("Nombre");
+    const apellido = within(dialogo).getByLabelText("Apellido");
+    expect(nombre).toHaveValue("Ana María");
+    expect(apellido).toHaveValue("Pérez");
+
+    await userEvent.clear(nombre);
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(nombre).toHaveFocus();
+    expect(nombre).toHaveAccessibleDescription("Escribe tu nombre.");
+    expect(perfilUpdates).toHaveLength(0);
+
+    await userEvent.type(nombre, " Ana ");
+    await userEvent.clear(apellido);
+    await userEvent.type(apellido, "Pérez Díaz");
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(perfilUpdates).toEqual([{ id: "u1", cambio: { nombre: "Ana", apellido: "Pérez Díaz" } }]);
+    expect(refreshPerfil).toHaveBeenCalledOnce();
+    expect(toastSuccess).toHaveBeenCalledWith("Tus datos se guardaron.");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
+  it("si no se puede guardar, el diálogo muestra el error y sigue abierto", async () => {
+    respuestaUpdate = { data: null, error: null }; // RLS: 0 filas
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByRole("button", { name: /Cuenta/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Editar mis datos" }));
+    const dialogo = await screen.findByRole("dialog");
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(await within(dialogo).findByText("No se pudieron guardar tus datos. Inténtalo de nuevo.")).toBeInTheDocument();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("sin red no intenta guardar mis datos", async () => {
+    const spy = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByRole("button", { name: /Cuenta/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Editar mis datos" }));
+    const dialogo = await screen.findByRole("dialog");
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(
+      await within(dialogo).findByText("Sin conexión. Necesitas internet para cambiar tus datos."),
+    ).toBeInTheDocument();
+    expect(perfilUpdates).toHaveLength(0);
+    spy.mockRestore();
   });
 });

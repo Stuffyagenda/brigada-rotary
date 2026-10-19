@@ -1,13 +1,17 @@
 "use client";
 
-import { LogOut, UserRound, Users } from "lucide-react";
+import { LogOut, UserRoundPen, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { toast } from "sonner";
+import { DatosPersonalesDialog } from "@/components/auth/DatosPersonalesDialog";
 import { InstallButton, useModoInstalacion } from "@/components/pwa/InstallButton";
+import { actualizarMisDatos, nombreCompletoDe } from "@/lib/auth/nombre";
 import { useProfile } from "@/lib/auth/profile";
 import { LOGIN_PATH } from "@/lib/auth/redirect";
 import { cn } from "@/lib/cn";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ROL_LABEL, TIPO_CLUB_LABEL } from "@/lib/types";
 
 export interface AccountMenuProps {
@@ -29,12 +33,13 @@ export function initials(nombre: string | null | undefined, email?: string | nul
 }
 
 /**
- * Menú de cuenta: nombre, club y rol; enlace a Miembros (solo admin), "Instalar app"
- * (o la instrucción de iPhone, si aplica) y Cerrar sesión.
+ * Menú de cuenta: nombre y apellido, club y rol; "Editar mis datos", enlace a
+ * Miembros (solo admin), "Instalar app" (o la instrucción de iPhone, si aplica)
+ * y Cerrar sesión.
  * Se monta dentro de `ProfileProvider` (layout `(app)`). Sin props obligatorias.
  */
 export function AccountMenu({ align = "end", className }: AccountMenuProps) {
-  const { profile, club, isAdmin, email, offline, signOut } = useProfile();
+  const { profile, club, isAdmin, email, offline, refresh, signOut } = useProfile();
   const modoInstalacion = useModoInstalacion();
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +49,7 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [editando, setEditando] = useState(false);
   // Se cierra al navegar (patrón "ajustar estado al cambiar una prop", sin efecto).
   const [lastPath, setLastPath] = useState(pathname);
   if (lastPath !== pathname) {
@@ -70,8 +76,9 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
     };
   }, [open]);
 
-  const nombre = profile?.nombre_completo?.trim() || email || "Tu cuenta";
-  const letras = initials(profile?.nombre_completo, email);
+  const nombrePerfil = nombreCompletoDe(profile);
+  const nombre = nombrePerfil || email || "Tu cuenta";
+  const letras = initials(nombrePerfil, email);
 
   async function onSignOut() {
     if (closing) return;
@@ -131,6 +138,21 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
             )}
           </div>
           <ul className="flex flex-col pt-1">
+            {profile && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setEditando(true);
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-base transition-colors duration-140 ease-out hover:bg-ink/5"
+                >
+                  <UserRoundPen aria-hidden="true" size={20} className="text-ink-soft" />
+                  Editar mis datos
+                </button>
+              </li>
+            )}
             {isAdmin && (
               <li>
                 <Link
@@ -161,6 +183,26 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
             </li>
           </ul>
         </div>
+      )}
+
+      {profile && (
+        <DatosPersonalesDialog
+          open={editando}
+          onOpenChange={setEditando}
+          title="Editar mis datos"
+          description="Así te verán los demás miembros. Necesitas conexión para guardar."
+          inicial={{ nombre: profile.nombre, apellido: profile.apellido }}
+          onSave={async (datos) => {
+            await actualizarMisDatos(getSupabaseBrowserClient(), profile.id, datos);
+            await refresh();
+            toast.success("Tus datos se guardaron.");
+          }}
+          onCloseAutoFocus={(e) => {
+            // El elemento del menú que lo abrió ya no existe: el foco vuelve al botón de cuenta.
+            e.preventDefault();
+            triggerRef.current?.focus();
+          }}
+        />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, MapPin } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type Path } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -15,6 +15,7 @@ import { encodePlusCode, type LatLng } from "@/lib/pluscode";
 import { mensajeConfirmacion } from "@/lib/report-diff";
 import { condicionesMedicasActivas, seccionesVisibles } from "@/lib/report-rules";
 import { saveReport } from "@/lib/sync";
+import { hoyPanama } from "@/lib/vigencia";
 import {
   CONDICIONES_MEDICAS,
   CONTADORES,
@@ -27,7 +28,18 @@ import {
   type Prioridad,
   type ReporteInput,
 } from "@/lib/types";
-import { Casilla, ErrorCampo, Etiqueta, FilaSiNo, GrupoChips, inputClass, Seccion, Segmentado } from "./campos";
+import {
+  Casilla,
+  ErrorCampo,
+  Etiqueta,
+  FilaSiNo,
+  GrupoChips,
+  inputClass,
+  inputFechaClass,
+  Seccion,
+  Segmentado,
+} from "./campos";
+import { Aviso } from "./Aviso";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { construirPayload, validarPayload, valoresIniciales, type FormValues } from "./form-values";
 import { PhotoField } from "./PhotoField";
@@ -88,17 +100,6 @@ export function ReportForm(props: ReportFormProps) {
   return <Formulario key={props.reporteId} {...props} reporte={esNuevo ? null : (reporte ?? null)} />;
 }
 
-function Aviso({ children, onClose }: { children: ReactNode; onClose: () => void }) {
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      {children}
-      <Button variant="secondary" onClick={onClose} className="self-start">
-        Volver
-      </Button>
-    </div>
-  );
-}
-
 const ESTADO_SEGMENTOS = [
   { value: "PENDIENTE", label: ESTADO_LABEL.PENDIENTE, marcado: "bg-pending font-semibold text-white" },
   { value: "ATENDIDO", label: ESTADO_LABEL.ATENDIDO, marcado: "bg-done font-semibold text-white" },
@@ -147,6 +148,8 @@ function Formulario({
     formState,
   } = useForm<FormValues>({ defaultValues: defaults });
   const { errors } = formState;
+  // Tope del selector de fecha: hoy en Panamá al abrir el formulario.
+  const [hoy] = useState(() => hoyPanama());
 
   // El perfil puede llegar después de abrir el formulario: rellena el brigadista si no se tocó.
   const nombrePerfil = profile?.nombre_completo ?? null;
@@ -414,6 +417,19 @@ function Formulario({
 
           {/* 2. Estado, prioridad y daño */}
           <Seccion titulo="Estado del caso">
+            <div>
+              <Etiqueta htmlFor="campo-fecha-reporte">Fecha del reporte</Etiqueta>
+              <input
+                id="campo-fecha-reporte"
+                type="date"
+                max={hoy}
+                required
+                className={inputFechaClass}
+                {...aria("fecha_reporte")}
+                {...register("fecha_reporte", { onChange: () => clearErrors("fecha_reporte") })}
+              />
+              <ErrorCampo id="error-fecha_reporte" mensaje={errorDe("fecha_reporte")} />
+            </div>
             <Controller
               control={control}
               name="estado"

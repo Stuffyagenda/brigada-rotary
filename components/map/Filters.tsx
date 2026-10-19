@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Filtros del mapa. Los chips de estado (con conteo) van siempre a la vista;
+ * Filtros del mapa. Los chips de vigencia (con conteo) van siempre a la vista;
  * prioridad, necesidad y club van en el panel "Filtros". Cambiar un filtro no
  * anima nada: los pines aparecen y desaparecen al instante.
  */
@@ -10,7 +10,9 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { cn } from "@/lib/cn";
-import { INSUMOS, PRIORIDADES, type Estado } from "@/lib/types";
+import { INSUMOS, PRIORIDADES, type Vigencia } from "@/lib/types";
+import { VIGENCIA_DESCRIPCION, VIGENCIA_LABEL, VIGENCIAS } from "@/lib/vigencia";
+import { GlifoVigencia } from "./GlifoVigencia";
 import type { ClubOpcion } from "./hooks";
 import { alternar, contarFiltrosExtra, FILTROS_VACIOS, type FiltrosMapa, type NecesidadFiltro } from "./url-state";
 
@@ -25,25 +27,11 @@ const NECESIDAD_OPCIONES: Array<{ value: NecesidadFiltro; label: string }> = [
   { value: "otros", label: "Otros insumos" },
 ];
 
-/** Glifo de estado: igual que el pin (relleno = pendiente, anillo = atendido). */
-export function GlifoEstado({ estado, className }: { estado: Estado; className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "inline-block size-3.5 shrink-0 rounded-full",
-        estado === "PENDIENTE" ? "bg-pending ring-2 ring-white" : "border-[3.5px] border-done bg-white",
-        className,
-      )}
-    />
-  );
-}
-
-export interface EstadoChipsProps {
+export interface VigenciaChipsProps {
   filtros: FiltrosMapa;
-  conteo: Record<Estado, number>;
+  conteo: Record<Vigencia, number>;
   onChange: (f: FiltrosMapa) => void;
-  /** Chips con sombra para ir sobre el mapa. */
+  /** Chips con sombra para ir sobre el mapa (móvil). */
   flotante?: boolean;
   /** Botón "Filtros". */
   onAbrirFiltros?: () => void;
@@ -51,8 +39,13 @@ export interface EstadoChipsProps {
   className?: string;
 }
 
-/** Chips "Pendientes N", "Atendidos N" y "Filtros". */
-export function EstadoChips({
+/**
+ * Chips de vigencia "Pendientes N", "Atendidos N" (0 a 3 días), "4+ días N" y
+ * "7+ días N", cada uno con el glifo del pin, y el botón "Filtros".
+ * Sobre el mapa (móvil) la fila se desplaza en horizontal: "Filtros" va
+ * primero para que esté siempre a mano.
+ */
+export function VigenciaChips({
   filtros,
   conteo,
   onChange,
@@ -60,55 +53,60 @@ export function EstadoChips({
   onAbrirFiltros,
   filtrosAbiertos = false,
   className,
-}: EstadoChipsProps) {
+}: VigenciaChipsProps) {
   const sombra = flotante && "shadow-[0_1px_2px_rgb(28_39_51/0.2),0_2px_8px_rgb(28_39_51/0.12)]";
   const extra = contarFiltrosExtra(filtros);
-  const chip = (estado: Estado, label: string) => (
+  const chip = (v: Vigencia) => (
     <Chip
-      pressed={filtros.estado.includes(estado)}
-      onPressedChange={() => onChange({ ...filtros, estado: alternar(filtros.estado, estado) })}
-      className={cn("shrink-0 gap-2 pr-3.5 pl-3", sombra)}
+      key={v}
+      pressed={filtros.vigencia.includes(v)}
+      onPressedChange={() => onChange({ ...filtros, vigencia: alternar(filtros.vigencia, v) })}
+      title={VIGENCIA_DESCRIPCION[v]}
+      className={cn("shrink-0 gap-2", flotante ? "pr-3 pl-2.5" : "pr-3.5 pl-3", sombra)}
     >
-      <GlifoEstado estado={estado} />
-      <span>{label}</span>
-      <span className="font-stamp text-lg leading-none">{conteo[estado]}</span>
+      <GlifoVigencia vigencia={v} />
+      <span>
+        {VIGENCIA_LABEL[v]}
+        {v !== "pendiente" && <span className="sr-only">: {VIGENCIA_DESCRIPCION[v]}</span>}
+      </span>
+      <span className="font-stamp text-lg leading-none">{conteo[v]}</span>
     </Chip>
   );
 
-  return (
-    <div
-      role="group"
-      aria-label="Filtrar por estado"
-      className={cn("flex items-center gap-2", !flotante && "flex-wrap", className)}
-    >
-      {chip("PENDIENTE", "Pendientes")}
-      {chip("ATENDIDO", "Atendidos")}
-      {onAbrirFiltros && (
-        <button
-          type="button"
-          onClick={onAbrirFiltros}
-          aria-expanded={filtrosAbiertos}
-          className={cn(
-            "inline-flex min-h-11 min-w-11 shrink-0 select-none items-center justify-center gap-2 rounded-full border text-base",
-            // Sobre el mapa (móvil) solo el icono y el número, para que quepan los tres chips.
-            flotante ? (extra > 0 ? "px-3" : "px-0") : "px-4",
-            "transition-[background-color,border-color] duration-120 ease-[ease]",
-            extra > 0 || filtrosAbiertos
-              ? "border-ink bg-ink font-semibold text-white"
-              : "border-line bg-white text-ink hover:border-ink-soft",
-            sombra,
-          )}
-        >
-          <SlidersHorizontal aria-hidden="true" className={flotante ? "size-5" : "size-4"} />
-          <span className={cn(flotante && "sr-only")}>Filtros</span>
-          {extra > 0 && (
-            <span className="font-stamp text-lg leading-none">
-              <span className="sr-only">activos: </span>
-              {extra}
-            </span>
-          )}
-        </button>
+  const botonFiltros = onAbrirFiltros && (
+    <button
+      type="button"
+      onClick={onAbrirFiltros}
+      aria-expanded={filtrosAbiertos}
+      className={cn(
+        "inline-flex min-h-11 min-w-11 shrink-0 select-none items-center justify-center gap-2 rounded-full border text-base",
+        // Sobre el mapa (móvil) solo el icono y el número.
+        flotante ? (extra > 0 ? "px-3" : "px-0") : "px-4",
+        "transition-[background-color,border-color] duration-120 ease-[ease]",
+        extra > 0 || filtrosAbiertos
+          ? "border-ink bg-ink font-semibold text-white"
+          : "border-line bg-white text-ink hover:border-ink-soft",
+        sombra,
       )}
+    >
+      <SlidersHorizontal aria-hidden="true" className={flotante ? "size-5" : "size-4"} />
+      <span className={cn(flotante && "sr-only")}>Filtros</span>
+      {extra > 0 && (
+        <span className="font-stamp text-lg leading-none">
+          <span className="sr-only">activos: </span>
+          {extra}
+        </span>
+      )}
+    </button>
+  );
+
+  return (
+    <div className={cn("flex items-center gap-2", !flotante && "flex-wrap", className)}>
+      {flotante && botonFiltros}
+      <div role="group" aria-label="Filtrar por vigencia de la atención" className={cn("flex items-center gap-2", !flotante && "flex-wrap")}>
+        {VIGENCIAS.map(chip)}
+      </div>
+      {!flotante && botonFiltros}
     </div>
   );
 }
@@ -135,7 +133,7 @@ export interface PanelFiltrosProps {
 /** Prioridad, necesidad y club. Combinables; se guardan en la URL. */
 export function PanelFiltros({ filtros, clubs, onChange, onListo, total }: PanelFiltrosProps) {
   const hayFiltros =
-    filtros.estado.length + filtros.prioridad.length + filtros.necesidad.length + filtros.club.length > 0;
+    filtros.vigencia.length + filtros.prioridad.length + filtros.necesidad.length + filtros.club.length > 0;
   return (
     <section aria-labelledby="titulo-filtros" className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">

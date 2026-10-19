@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthSwitchLink } from "@/components/auth/AuthSwitchLink";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { REGISTRO_PATH } from "@/lib/auth/redirect";
 
 export const metadata: Metadata = { title: "Iniciar sesión" };
 
@@ -18,8 +20,13 @@ export default function LoginPage() {
             <p className="text-sm text-ink-soft">Rotary y Rotaract</p>
           </div>
         </div>
-        <p className="mb-6 text-ink-soft">Entra con el correo y la contraseña que te dio tu club.</p>
+        <p className="mb-6 text-ink-soft">Entra con tu correo y tu contraseña.</p>
         <LoginForm />
+        <div className="mt-5 border-t border-line pt-3">
+          <AuthSwitchLink to={REGISTRO_PATH} prompt="¿No tienes cuenta?">
+            Crear cuenta
+          </AuthSwitchLink>
+        </div>
       </AuthCard>
     </main>
   );

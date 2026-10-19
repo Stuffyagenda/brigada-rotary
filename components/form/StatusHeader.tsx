@@ -34,13 +34,20 @@ export function StatusHeader({
   estado,
   titulo,
   subtitulo,
+  sello,
   onClose,
 }: {
   estado: Estado;
   titulo: string;
   subtitulo?: string;
+  /**
+   * Texto del sello en lugar del estado (p. ej. "Nueva visita" sobre la franja
+   * verde). Se anuncia al lector de pantalla en lugar de "Estado: …".
+   */
+  sello?: string;
   onClose: () => void;
 }) {
+  const textoDe = (e: Estado) => (sello && e === estado ? sello : SELLO[e].texto);
   return (
     <header className="flex shrink-0 items-stretch border-b border-line bg-white">
       <div className="relative w-28 shrink-0 overflow-hidden" data-testid="franja-estado" data-estado={estado}>
@@ -49,12 +56,12 @@ export function StatusHeader({
           <span
             data-activo={estado === "PENDIENTE"}
             className={cn(
-              "font-stamp text-lg uppercase leading-none text-white",
+              "text-center font-stamp text-lg uppercase leading-none text-white",
               FUNDIDO,
               estado === "PENDIENTE" ? VISIBLE : OCULTO,
             )}
           >
-            {SELLO.PENDIENTE.texto}
+            {textoDe("PENDIENTE")}
           </span>
         </div>
         {/* Capa verde encima: aparece con opacidad + blur sobre la roja (sin mezcla lavada a mitad). */}
@@ -68,16 +75,16 @@ export function StatusHeader({
             estado === "ATENDIDO" ? VISIBLE : OCULTO,
           )}
         >
-          <span className="font-stamp text-lg uppercase leading-none text-white">{SELLO.ATENDIDO.texto}</span>
+          <span className="text-center font-stamp text-lg uppercase leading-none text-white">
+            {textoDe("ATENDIDO")}
+          </span>
         </div>
         <span aria-hidden="true" className="absolute inset-y-0 right-0 w-2" style={PERFORADO} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-1 pl-3">
         <h2 className="truncate text-lg font-bold leading-tight text-ink">{titulo}</h2>
         {subtitulo && <p className="truncate text-sm text-ink-soft">{subtitulo}</p>}
-        <p className="sr-only">
-          Estado: {SELLO[estado].texto}
-        </p>
+        <p className="sr-only">{sello ?? `Estado: ${SELLO[estado].texto}`}</p>
       </div>
       <div className="flex items-center pr-2">
         <Button variant="ghost" size="icon" aria-label="Cerrar formulario" onClick={onClose}>

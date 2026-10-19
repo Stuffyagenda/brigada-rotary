@@ -3,6 +3,7 @@
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { inputClass } from "@/components/auth/campos";
 import { Button } from "@/components/ui/Button";
 import { loginErrorMessage, MSG_CREDENCIALES, MSG_SIN_CONFIG } from "@/lib/auth/errors";
 import { safeNextPath } from "@/lib/auth/redirect";
@@ -10,17 +11,12 @@ import { cn } from "@/lib/cn";
 import { hasSupabaseEnv } from "@/lib/env";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const inputClass =
-  "block min-h-12 w-full rounded-lg border border-line bg-white px-3 text-base text-ink " +
-  "transition-[border-color] duration-140 ease-out placeholder:text-ink-soft " +
-  "hover:border-ink-soft focus-visible:border-rotary aria-invalid:border-pending";
-
 /** Destino tras entrar: `?next=` si es una ruta interna, si no `/`. */
 function destino(): string {
   return safeNextPath(new URLSearchParams(window.location.search).get("next"));
 }
 
-/** Formulario de inicio de sesión con correo y contraseña (sin registro ni magic link). */
+/** Formulario de inicio de sesión con correo y contraseña (sin magic link; el registro vive en /registro). */
 export function LoginForm() {
   const router = useRouter();
   const id = useId();

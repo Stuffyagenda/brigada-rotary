@@ -2,16 +2,18 @@
 
 /**
  * Resumen del panel: "N pendientes en esta zona" (lo que se ve con el panel
- * asomado) y, debajo, la lista de pendientes de la zona por prioridad. La
- * lista es también la alternativa accesible a tocar los pines.
+ * asomado), "N familias necesitan nueva visita" si hay atendidos hace 7 días o
+ * más y, debajo, las listas de la zona: pendientes por prioridad y familias por
+ * revisitar. Las listas son también la alternativa accesible a tocar los pines.
  */
 import { List, MapPin, Plus, X } from "lucide-react";
 import Link from "next/link";
-import { GlifoEstado } from "@/components/map/Filters";
+import { GlifoVigencia } from "@/components/map/GlifoVigencia";
 import { Button } from "@/components/ui/Button";
 import type { ReporteLocal } from "@/lib/db";
 import { encodePlusCode, type LatLng } from "@/lib/pluscode";
 import { PRIORIDADES } from "@/lib/types";
+import { diasDesdeAtencion, textoAtendidoHace, vigencia as vigenciaDe } from "@/lib/vigencia";
 import { listaNecesidades, tituloReporte } from "./format";
 
 const PRIORIDAD_TEXTO = { ALTA: "Prioridad alta", MEDIA: "Prioridad media", BAJA: "Prioridad baja" } as const;
@@ -28,6 +30,20 @@ export function ordenarPendientes(reportes: readonly ReporteLocal[]): ReporteLoc
     );
 }
 
+/** Atendidos hace 7 días o más, del que lleva más tiempo sin visita al que menos. */
+export function ordenarVencidos(reportes: readonly ReporteLocal[], ahora: Date = new Date()): ReporteLocal[] {
+  return reportes
+    .map((r) => ({ r, dias: diasDesdeAtencion(r, ahora) }))
+    .filter(({ r }) => vigenciaDe(r, ahora) === "vencido")
+    .sort((a, b) => (b.dias ?? Infinity) - (a.dias ?? Infinity))
+    .map(({ r }) => r);
+}
+
+/** "1 familia necesita nueva visita", "3 familias necesitan nueva visita". */
+export function textoNecesitanVisita(n: number): string {
+  return n === 1 ? "1 familia necesita nueva visita" : `${n} familias necesitan nueva visita`;
+}
+
 export interface PanelResumenProps {
   /** Reportes visibles (filtrados) dentro del área del mapa. */
   enZona: readonly ReporteLocal[];
@@ -35,6 +51,8 @@ export interface PanelResumenProps {
   hayReportes: boolean;
   loading: boolean;
   hayFiltros: boolean;
+  /** Referencia de la vigencia (la de `useAhora()`). */
+  ahora: Date;
   ubicacion: LatLng | null;
   onAbrir: (id: string) => void;
   onRegistrarAqui: () => void;
@@ -48,6 +66,7 @@ export function PanelResumen({
   hayReportes,
   loading,
   hayFiltros,
+  ahora,
   ubicacion,
   onAbrir,
   onRegistrarAqui,
@@ -55,6 +74,7 @@ export function PanelResumen({
   mostrarEnlaceLista = true,
 }: PanelResumenProps) {
   const pendientes = ordenarPendientes(enZona);
+  const vencidos = ordenarVencidos(enZona, ahora);
   const atendidos = enZona.length - pendientes.length;
 
   return (
@@ -81,37 +101,43 @@ export function PanelResumen({
         </section>
       )}
 
-      <div className="flex items-start justify-between gap-3">
-        {loading ? (
-          <p className="py-2 text-ink-soft">Leyendo los reportes guardados en este celular</p>
-        ) : !hayReportes ? (
-          <div>
-            <p className="text-lg font-bold">Todavía no hay reportes en este celular</p>
-            <p className="text-ink-soft">Con conexión, se descargan solos.</p>
-          </div>
-        ) : (
-          <div aria-live="polite" className="min-w-0">
-            <p className="flex items-baseline gap-2">
-              <span className="font-stamp text-2xl text-pending">{pendientes.length}</span>
-              <span className="text-lg font-bold">{pendientes.length === 1 ? "pendiente" : "pendientes"}</span>
-            </p>
-            <p className="text-ink-soft">
-              en esta zona
-              <span className="block">
-                {atendidos === 1 ? "1 atendido" : `${atendidos} atendidos`}
-                {hayFiltros && ", con los filtros activos"}
-              </span>
-            </p>
-          </div>
-        )}
-        {mostrarEnlaceLista && (
-          <Link
-            href="/registros"
-            className="-mr-1 inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 font-semibold text-rotary hover:bg-ink/5"
-          >
-            <List aria-hidden="true" className="size-5" />
-            Registros
-          </Link>
+      <div aria-live={!loading && hayReportes ? "polite" : undefined} className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-3">
+          {loading ? (
+            <p className="py-2 text-ink-soft">Leyendo los reportes guardados en este celular</p>
+          ) : !hayReportes ? (
+            <div>
+              <p className="text-lg font-bold">Todavía no hay reportes en este celular</p>
+              <p className="text-ink-soft">Con conexión, se descargan solos.</p>
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <p className="flex items-baseline gap-2">
+                <span className="font-stamp text-2xl text-pending">{pendientes.length}</span>
+                <span className="text-lg font-bold">{pendientes.length === 1 ? "pendiente" : "pendientes"}</span>
+              </p>
+              <p className="text-ink-soft">
+                en esta zona, {atendidos === 1 ? "1 atendido" : `${atendidos} atendidos`}
+                {hayFiltros && <span className="block">con los filtros activos</span>}
+              </p>
+            </div>
+          )}
+          {mostrarEnlaceLista && (
+            <Link
+              href="/registros"
+              className="-mr-1 inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 font-semibold text-rotary hover:bg-ink/5"
+            >
+              <List aria-hidden="true" className="size-5" />
+              Registros
+            </Link>
+          )}
+        </div>
+        {/* Atendidos hace 7 días o más: a la vista con el panel asomado, a todo el ancho. */}
+        {!loading && vencidos.length > 0 && (
+          <p className="flex items-center gap-2 font-bold" data-testid="necesitan-visita">
+            <GlifoVigencia vigencia="vencido" />
+            {textoNecesitanVisita(vencidos.length)}
+          </p>
         )}
       </div>
 
@@ -135,7 +161,7 @@ export function PanelResumen({
                       onClick={() => onAbrir(r.id)}
                       className="flex min-h-14 w-full items-start gap-3 py-3 text-left hover:bg-ink/[0.03]"
                     >
-                      <GlifoEstado estado={r.estado} className="mt-1.5" />
+                      <GlifoVigencia vigencia="pendiente" className="mt-1.5" />
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold break-words">{tituloReporte(r)}</span>
                         <span className="block text-sm text-ink-soft">
@@ -152,6 +178,39 @@ export function PanelResumen({
           {pendientes.length > MAX_FILAS && (
             <p className="mt-2 text-sm text-ink-soft">
               Se muestran {MAX_FILAS} de {pendientes.length}. Acerca el mapa para ver el resto.
+            </p>
+          )}
+        </section>
+      )}
+
+      {!loading && vencidos.length > 0 && (
+        <section aria-labelledby="titulo-vencidos-zona">
+          <h2 id="titulo-vencidos-zona" className="text-sm font-semibold text-ink-soft">
+            Necesitan nueva visita, la más antigua primero
+          </h2>
+          <ul className="mt-1 divide-y divide-line border-y border-line">
+            {vencidos.slice(0, MAX_FILAS).map((r) => {
+              const dias = diasDesdeAtencion(r, ahora);
+              return (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => onAbrir(r.id)}
+                    className="flex min-h-14 w-full items-start gap-3 py-3 text-left hover:bg-ink/[0.03]"
+                  >
+                    <GlifoVigencia vigencia="vencido" className="mt-1.5" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold break-words">{tituloReporte(r)}</span>
+                      {dias !== null && <span className="block text-sm text-ink-soft">{textoAtendidoHace(dias)}</span>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {vencidos.length > MAX_FILAS && (
+            <p className="mt-2 text-sm text-ink-soft">
+              Se muestran {MAX_FILAS} de {vencidos.length}. Acerca el mapa para ver el resto.
             </p>
           )}
         </section>

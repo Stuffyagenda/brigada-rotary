@@ -10,4 +10,6 @@ export const COLOR = {
   gold: "#f7a81b",
   pending: "#c4122f",
   done: "#0e7c47",
+  aging: "#b45309",
+  stale: "#000000",
 } as const;

@@ -583,10 +583,11 @@ describe("saveVisita", () => {
       nec_agua: true,
       _sync: "pending",
     });
-    // Un solo upsert del reporte (colapsado); la visita aún no se encola (TODO sync-visitas).
+    // Un solo upsert del reporte (colapsado) y, detrás, la visita.
     const cola = await entradas();
-    expect(cola).toHaveLength(1);
+    expect(cola).toHaveLength(2);
     expect(cola[0].payload).toMatchObject({ estado: "ATENDIDO", ent_agua: true });
+    expect(cola[1]).toMatchObject({ entidad: "visita", reporteId, visitaId: id, op: "upsert", payload: null });
   });
 
   it("con fecha pasada: visitado_at y attended_at caen en esa fecha (Panamá)", async () => {
@@ -620,12 +621,13 @@ describe("saveVisita", () => {
     expect((await db.reportes.get(reporteId))?.estado).toBe("PENDIENTE");
   });
 
-  it("con red sube el reporte; la visita sigue pendiente hasta que el motor la envíe", async () => {
+  it("con red sube el reporte y la visita", async () => {
     const { id: reporteId } = await saveReport(reporteVacio(7.96, -80.43));
     const { id, status } = await saveVisita({ ...visitaVacia(reporteId), ent_agua: true });
-    expect(status).toBe("pending");
+    expect(status).toBe("synced");
     expect(fake.state.rows.get(reporteId)?.estado).toBe("ATENDIDO");
-    expect((await db.visitas.get(id))?._sync).toBe("pending");
+    expect(fake.state.visitas.get(id)?.ent_agua).toBe(true);
+    expect((await db.visitas.get(id))?._sync).toBe("synced");
   });
 });
 
@@ -643,7 +645,7 @@ describe("outbox con entradas de visita", () => {
     };
   }
 
-  it("el motor actual las deja intactas y no impide marcar synced el reporte", async () => {
+  it("una entrada de visita sin payload se descarta y no impide marcar synced el reporte", async () => {
     setOnline(false);
     await saveReport({ ...reporteVacio(7.96, -80.43), id: ID_A });
     await db.outbox.add(entradaVisita(ID_A) as OutboxEntry);
@@ -651,9 +653,8 @@ describe("outbox con entradas de visita", () => {
     const r = await syncNow();
     expect(r.error).toBeUndefined();
     expect(fake.state.calls.filter((c) => c.startsWith("upsert:"))).toEqual([`upsert:${ID_A}`]);
-    const cola = await entradas();
-    expect(cola).toHaveLength(1);
-    expect(cola[0]).toMatchObject({ entidad: "visita", reporteId: ID_A, intentos: 0 });
+    expect(fake.state.calls.filter((c) => c.startsWith("visitas.upsert:"))).toEqual([]);
+    expect(await db.outbox.count()).toBe(0);
     expect((await db.reportes.get(ID_A))?._sync).toBe("synced");
   });
 

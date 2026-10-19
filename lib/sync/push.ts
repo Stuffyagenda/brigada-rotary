@@ -11,8 +11,13 @@
  *
  * Si el usuario edita el reporte mientras se envía, la entrada cambia de `rev` y
  * no se borra: se envía de nuevo en la siguiente pasada.
+ *
+ * Visitas: una entrada de visita solo se envía si no queda en la cola ninguna
+ * entrada anterior (seq menor) de su reporte (FK `visitas.reporte_id`): si el
+ * reporte falló o está en espera, la visita espera con él. Con la fila devuelta
+ * por el servidor, la visita local queda `synced`.
  */
-import { db, type ReporteLocal } from "@/lib/db";
+import { db, type ReporteLocal, type VisitaLocal } from "@/lib/db";
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
 import { BUCKET_FOTOS } from "@/lib/sync/client";
 import { clasificarError, conStatus, mensajeDe, SyncError, type ErrorKind } from "@/lib/sync/errors";
@@ -20,12 +25,18 @@ import {
   backoffMs,
   contarColaReporte,
   entradasOrdenadas,
+  esEntradaReporte,
   esEntradaVisita,
+  tieneColaVisita,
   type OutboxEntrySync,
 } from "@/lib/sync/outbox";
 import { normalizarRemoto } from "@/lib/sync/pull";
 import { rutaFotoNueva } from "@/lib/sync/uuid";
-import type { Reporte, ReporteUpsert } from "@/lib/types";
+import type { Reporte, ReporteUpsert, Visita, VisitaUpsert } from "@/lib/types";
+
+/** Mensaje cuando el servidor rechaza una visita porque su reporte ya no existe (FK 23503). */
+export const MSG_VISITA_REPORTE_INEXISTENTE =
+  "La visita no se pudo guardar: su reporte no existe en el servidor (quizá lo borró un administrador).";
 
 export interface PushResult {
   /** Entradas confirmadas por el servidor. */
@@ -129,11 +140,73 @@ async function enviarDelete(client: TypedSupabaseClient, entry: OutboxEntrySync)
   await db.outbox.delete(entry.seq);
 }
 
+/** Copia de la visita con solo las columnas que se envían (`created_by` lo fija el trigger). */
+export function visitaParaServidor(payload: VisitaUpsert): VisitaUpsert {
+  const copia: Record<string, unknown> = { ...payload };
+  delete copia.created_by;
+  delete copia._sync;
+  return copia as VisitaUpsert;
+}
+
+/**
+ * `true` si queda en la cola alguna entrada del reporte de la visita anterior a
+ * ella (pendiente, en espera o rechazada): la visita no puede ir antes (FK).
+ */
+async function reporteAnteriorEnCola(entry: OutboxEntrySync): Promise<boolean> {
+  const n = await db.outbox
+    .where("reporteId")
+    .equals(entry.reporteId)
+    .filter((e) => esEntradaReporte(e) && e.seq < entry.seq)
+    .count();
+  return n > 0;
+}
+
+/** Envía una entrada de visita. Lanza el error de Supabase si falla. */
+async function enviarVisita(client: TypedSupabaseClient, entry: OutboxEntrySync): Promise<void> {
+  const visitaId = entry.visitaId;
+  if (!visitaId || (entry.op === "upsert" && !entry.visitaPayload)) {
+    // Entrada corrupta: no hay nada que enviar.
+    await db.outbox.delete(entry.seq);
+    return;
+  }
+
+  if (entry.op === "delete") {
+    const { error, status } = await client.from("visitas").delete().eq("id", visitaId);
+    if (error) throw conStatus(error, status);
+    await db.outbox.delete(entry.seq);
+    return;
+  }
+
+  const { data, error, status } = await client
+    .from("visitas")
+    .upsert(visitaParaServidor(entry.visitaPayload!), { onConflict: "id" })
+    .select()
+    .single();
+  if (error) {
+    // FK: el reporte no está en el servidor (p. ej. lo borró un admin). No se reintenta solo.
+    if ((error as { code?: unknown }).code === "23503") throw new SyncError("fatal", MSG_VISITA_REPORTE_INEXISTENTE);
+    throw conStatus(error, status);
+  }
+  if (!data) throw new SyncError("fatal", "El servidor no devolvió la visita guardada.");
+
+  const fila = data as unknown as Visita;
+  await db.transaction("rw", db.outbox, db.visitas, async () => {
+    const actual = (await db.outbox.get(entry.seq)) as OutboxEntrySync | undefined;
+    // Se borró (deleteReport) o se movió al final de la cola (nuevo guardado) mientras tanto.
+    if (!actual) return;
+    if ((actual.rev ?? 1) === (entry.rev ?? 1)) await db.outbox.delete(entry.seq);
+    if (await tieneColaVisita(entry.reporteId, visitaId)) return;
+    if (!(await db.visitas.get(visitaId))) return;
+    const local: VisitaLocal = { ...fila, _sync: "synced" };
+    await db.visitas.put(local);
+  });
+}
+
 /** Registra el fallo de una entrada según su clasificación. */
 async function registrarFallo(entry: OutboxEntrySync, kind: ErrorKind, mensaje: string): Promise<void> {
   if (kind === "auth") return; // No es culpa de la entrada: se espera un nuevo inicio de sesión.
   const intentos = entry.intentos + 1;
-  await db.transaction("rw", db.outbox, db.reportes, async () => {
+  await db.transaction("rw", db.outbox, db.reportes, db.visitas, async () => {
     const actual = (await db.outbox.get(entry.seq)) as OutboxEntrySync | undefined;
     if (!actual) return;
     // Si el usuario editó la entrada durante el envío, el error ya no aplica.
@@ -145,14 +218,18 @@ async function registrarFallo(entry: OutboxEntrySync, kind: ErrorKind, mensaje: 
       fatal: kind === "fatal",
     };
     await db.outbox.update(entry.seq, cambios);
-    if (kind === "fatal" && actual.op === "upsert" && !esEntradaVisita(actual)) {
+    if (kind !== "fatal" || actual.op !== "upsert") return;
+    if (esEntradaVisita(actual)) {
+      if (actual.visitaId) await db.visitas.update(actual.visitaId, { _sync: "error" });
+    } else {
       await db.reportes.update(entry.reporteId, { _sync: "error" });
     }
   });
 }
 
 /**
- * Envía la cola en orden.
+ * Envía la cola en orden de `seq`. Los rechazos (fatal) marcan la entrada y la
+ * pasada sigue; un fallo de red o de sesión la corta.
  * @param force `true` (manual / al guardar): ignora el backoff y reintenta las entradas con error.
  */
 export async function pushOutbox(client: TypedSupabaseClient, force: boolean): Promise<PushResult> {
@@ -162,15 +239,16 @@ export async function pushOutbox(client: TypedSupabaseClient, force: boolean): P
   let error: string | undefined;
 
   for (const entry of entradas) {
-    // TODO(sync-visitas): enviar las entradas de visita (siempre después del
-    // upsert de su reporte, por la FK). Hasta entonces se dejan intactas en la cola.
-    if (esEntradaVisita(entry)) continue;
+    const esVisita = esEntradaVisita(entry);
     if (!force) {
       if (entry.fatal) continue;
       if (entry.nextAttemptAt && Date.parse(entry.nextAttemptAt) > ahora) continue;
     }
+    // FK: la visita espera a que su reporte llegue al servidor.
+    if (esVisita && (await reporteAnteriorEnCola(entry))) continue;
     try {
-      if (entry.op === "delete") await enviarDelete(client, entry);
+      if (esVisita) await enviarVisita(client, entry);
+      else if (entry.op === "delete") await enviarDelete(client, entry);
       else await enviarUpsert(client, entry);
       subidos += 1;
     } catch (err) {
@@ -179,7 +257,7 @@ export async function pushOutbox(client: TypedSupabaseClient, force: boolean): P
       await registrarFallo(entry, kind, mensaje);
       if (kind === "auth") return { subidos, stop: "auth", error: mensaje };
       if (kind === "network") return { subidos, stop: "network", error: mensaje };
-      error = `El servidor rechazó un reporte: ${mensaje}`;
+      error = `${esVisita ? "El servidor rechazó una visita" : "El servidor rechazó un reporte"}: ${mensaje}`;
     }
   }
   return { subidos, error };

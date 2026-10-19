@@ -5,35 +5,46 @@
  * garantizan los permisos en el servidor.
  */
 import { isNetworkError } from "@/lib/auth/errors";
+import { nombreCompletoDe } from "@/lib/auth/nombre";
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
 import { ROL_LABEL, type Club, type Rol } from "@/lib/types";
 
 /** Columnas de `profiles` que muestra la página (el email vive en auth.users y no es accesible). */
 export interface Miembro {
   id: string;
+  nombre: string | null;
+  apellido: string | null;
+  /** Lo recalcula el trigger al cambiar nombre o apellido; respaldo para perfiles antiguos. */
   nombre_completo: string | null;
   club_id: string | null;
   rol: Rol;
   activo: boolean;
 }
 
-export type MiembroCambio = Partial<Pick<Miembro, "club_id" | "rol" | "activo">>;
+/**
+ * Cambio que hace el admin. `nombre` y `apellido` van juntos (diálogo de datos);
+ * `nombre_completo` nunca se envía: lo recalcula `protect_profile_fields`.
+ */
+export type MiembroCambio = Partial<Pick<Miembro, "club_id" | "rol" | "activo" | "nombre" | "apellido">>;
 
 export type ClubOpcion = Pick<Club, "id" | "nombre" | "tipo">;
 
-const COLUMNAS = "id, nombre_completo, club_id, rol, activo";
+const COLUMNAS = "id, nombre, apellido, nombre_completo, club_id, rol, activo";
 
 export const MSG_ADMIN_SIN_RED = "Sin conexión. Necesitas internet para administrar miembros.";
 
-export function nombreVisible(m: Pick<Miembro, "nombre_completo">): string {
-  return m.nombre_completo?.trim() || "Sin nombre";
+type ConNombre = Partial<Pick<Miembro, "nombre" | "apellido" | "nombre_completo">>;
+
+/** "Nombre Apellido" (o el nombre completo de un perfil antiguo), o "Sin nombre". */
+export function nombreVisible(m: ConNombre): string {
+  return nombreCompletoDe(m) || "Sin nombre";
 }
 
-/** Orden alfabético por nombre (los "Sin nombre" al final). */
-export function ordenarMiembros<T extends Pick<Miembro, "nombre_completo">>(lista: readonly T[]): T[] {
+/** Orden alfabético por "Nombre Apellido" (los "Sin nombre" al final). */
+export function ordenarMiembros<T extends ConNombre>(lista: readonly T[]): T[] {
   return [...lista].sort((a, b) => {
-    const na = a.nombre_completo?.trim();
-    const nb = b.nombre_completo?.trim();
+    const na = nombreCompletoDe(a);
+    const nb = nombreCompletoDe(b);
     if (!na && !nb) return 0;
     if (!na) return 1;
     if (!nb) return -1;
@@ -137,6 +148,9 @@ export function avisoGuardado(miembro: Miembro, cambio: MiembroCambio, clubs: re
     return cambio.activo ? `Acceso de ${nombre} activado.` : `Acceso de ${nombre} desactivado.`;
   }
   if (cambio.rol !== undefined) return `Rol de ${nombre}: ${ROL_LABEL[cambio.rol]}.`;
+  if (cambio.nombre !== undefined || cambio.apellido !== undefined) {
+    return `Datos de ${nombreVisible(miembro)} guardados.`;
+  }
   if (cambio.club_id !== undefined) {
     const club = clubs.find((c) => c.id === cambio.club_id);
     return club ? `${nombre} ahora es de ${club.nombre}.` : `${nombre} ya no tiene club asignado.`;

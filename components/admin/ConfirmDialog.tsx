@@ -15,8 +15,10 @@ export interface ConfirmDialogProps {
 }
 
 // Entrada scale(0.96) + opacidad, 200 ms; salida 150 ms. Con movimiento
-// reducido, solo opacidad. React 19 sube y deduplica este <style> en <head>.
-const KEYFRAMES = `
+// reducido, solo opacidad. React 19 sube y deduplica este <style> en <head>
+// (lo comparten los diálogos de `components/auth/DatosPersonalesDialog.tsx`).
+export const DIALOG_STYLE_HREF = "br-confirm-dialog";
+export const DIALOG_KEYFRAMES = `
 @keyframes br-dialog-in { from { opacity: 0; scale: 0.96; } }
 @keyframes br-dialog-out { to { opacity: 0; scale: 0.96; } }
 @keyframes br-fade-in { from { opacity: 0; } }
@@ -44,8 +46,8 @@ export function ConfirmDialog({
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
-        <style href="br-confirm-dialog" precedence="default">
-          {KEYFRAMES}
+        <style href={DIALOG_STYLE_HREF} precedence="default">
+          {DIALOG_KEYFRAMES}
         </style>
         <AlertDialog.Overlay className="br-overlay fixed inset-0 z-50 bg-ink/40" />
         <AlertDialog.Content className="br-dialog fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-line bg-white p-6 shadow-[0_16px_48px_-12px_rgb(28_39_51/0.35)]">

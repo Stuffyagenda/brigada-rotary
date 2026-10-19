@@ -6,11 +6,12 @@
  * versión nueva del esquema Dexie.
  *
  * Entidades: las entradas sin `entidad` (o con `"reporte"`) son de reportes.
- * Las de `"visita"` todavía no las envía el motor (`pushOutbox` las deja
- * intactas en la cola); ver TODO(sync-visitas) en lib/sync/index.ts.
+ * Las de `"visita"` llevan `reporteId` (el de su reporte), `visitaId` y
+ * `visitaPayload`; el motor las envía después de cualquier entrada anterior de
+ * su reporte (FK `visitas.reporte_id`).
  */
 import { db, type OutboxEntidad, type OutboxEntry } from "@/lib/db";
-import type { ReporteUpsert } from "@/lib/types";
+import type { ReporteUpsert, VisitaUpsert } from "@/lib/types";
 
 /** Entrada del outbox con los campos de control del motor de sync. */
 export interface OutboxEntrySync extends OutboxEntry {
@@ -130,4 +131,60 @@ export async function encolarUpsert(
   await db.outbox.put(siguiente);
   if (resto.length) await db.outbox.bulkDelete(resto.map((e) => e.seq));
   return siguiente.payload ?? payload;
+}
+
+/**
+ * `true` si la visita tiene entradas en la cola. Usar dentro de una transacción
+ * con `db.outbox`. (`visitaId` no está indexado: se busca entre las entradas de su reporte.)
+ */
+export async function tieneColaVisita(reporteId: string, visitaId: string): Promise<boolean> {
+  return (await entradasDeVisita(reporteId, visitaId).count()) > 0;
+}
+
+function entradasDeVisita(reporteId: string, visitaId: string) {
+  return db.outbox
+    .where("reporteId")
+    .equals(reporteId)
+    .filter((e) => esEntradaVisita(e) && e.visitaId === visitaId);
+}
+
+/**
+ * Encola el `upsert` de una visita. Debe llamarse dentro de una transacción `rw`
+ * sobre `db.outbox`, DESPUÉS de encolar el upsert de su reporte (si lo hay).
+ *
+ * Colapso: varias entradas `upsert` de la misma visita quedan en una. Se
+ * reemplaza en su sitio (mismo `seq`, `rev` + 1) si ese sitio sigue siendo
+ * posterior a todas las entradas de su reporte; si no, pasa al final de la cola,
+ * para que el motor envíe siempre antes el reporte (FK).
+ */
+export async function encolarVisita(payload: VisitaUpsert, ahoraIso: string): Promise<void> {
+  const deLaVisita = (await entradasDeVisita(payload.reporte_id, payload.id).sortBy("seq")) as OutboxEntrySync[];
+  const existentes = deLaVisita.filter((e) => e.op === "upsert");
+  const ultimoReporte = Math.max(
+    0,
+    ...(await db.outbox.where("reporteId").equals(payload.reporte_id).filter(esEntradaReporte).toArray()).map(
+      (e) => e.seq,
+    ),
+  );
+  const rev = existentes.length ? Math.max(...existentes.map((e) => e.rev ?? 1)) + 1 : 1;
+  const entry: Omit<OutboxEntrySync, "seq"> = {
+    entidad: "visita",
+    reporteId: payload.reporte_id,
+    visitaId: payload.id,
+    op: "upsert",
+    payload: null,
+    visitaPayload: payload,
+    intentos: 0,
+    createdAt: existentes[0]?.createdAt ?? ahoraIso,
+    rev,
+  };
+
+  const [base, ...resto] = existentes;
+  if (base && base.seq > ultimoReporte) {
+    await db.outbox.put({ ...entry, seq: base.seq } as OutboxEntry);
+    if (resto.length) await db.outbox.bulkDelete(resto.map((e) => e.seq));
+    return;
+  }
+  if (existentes.length) await db.outbox.bulkDelete(existentes.map((e) => e.seq));
+  await db.outbox.add(entry as OutboxEntry);
 }
