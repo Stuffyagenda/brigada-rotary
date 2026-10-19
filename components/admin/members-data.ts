@@ -60,6 +60,10 @@ export function adminErrorMessage(error: unknown, accion = "guardar el cambio"):
   if (isNetworkError(error) || (typeof navigator !== "undefined" && !navigator.onLine)) {
     return accion === "cargar los miembros" ? MSG_ADMIN_SIN_RED : "Sin conexión. El cambio no se guardó.";
   }
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === "23514") {
+    return "Supabase rechazó el cambio de aprobación. Recarga la aplicación; aprobar debe actualizar el estado y el acceso juntos.";
+  }
   const msg = error instanceof Error ? error.message : String((error as { message?: unknown })?.message ?? "");
   if (msg.includes("Solo un administrador")) return "Solo un administrador activo puede hacer este cambio.";
   return `No se pudo ${accion}. Inténtalo de nuevo.`;

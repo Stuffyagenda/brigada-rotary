@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  adminErrorMessage,
   avisoGuardado,
   bloqueoPropio,
   confirmacionNecesaria,
@@ -56,6 +57,10 @@ const pendiente: Miembro = {
 };
 
 describe("reglas de miembros", () => {
+  it("explica cómo resolver un rechazo de aprobación en Postgres", () => {
+    expect(adminErrorMessage({ code: "23514" })).toMatch(/Recarga la aplicación/);
+  });
+
   it("bloquea que un admin se quite el rol o se desactive a sí mismo", () => {
     expect(bloqueoPropio("u1", yo, { rol: "miembro" })?.title).toMatch(/quitarte el rol/);
     expect(bloqueoPropio("u1", yo, { activo: false })?.title).toMatch(/desactivar tu propio acceso/);

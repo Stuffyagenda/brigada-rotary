@@ -169,6 +169,13 @@ describe("gateView", () => {
     expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false } })).toBe("inactive");
     expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false, estado_aprobacion: "pendiente" } })).toBe("pending");
     expect(gateView({ ...base, status: "signed-in", profile: { ...profile, activo: false, estado_aprobacion: "rechazado" } })).toBe("rejected");
+    expect(
+      gateView({
+        ...base,
+        status: "signed-in",
+        profile: { ...profile, estado_aprobacion: undefined } as unknown as Profile,
+      }),
+    ).toBe("approval-unavailable");
     expect(gateView({ ...base, status: "loading", profile: null })).toBe("loading");
     expect(gateView({ ...base, status: "loading" })).toBe("app");
     expect(gateView({ ...base, status: "signed-in", profile: null })).toBe("no-profile");
