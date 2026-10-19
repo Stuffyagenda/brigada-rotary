@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  adminErrorMessage,
   avisoGuardado,
   bloqueoPropio,
   confirmacionNecesaria,
@@ -19,6 +20,9 @@ const yo: Miembro = {
   club_id: "c1",
   rol: "admin",
   activo: true,
+  estado_aprobacion: "aprobado",
+  email: "ana@example.org",
+  email_confirmado: true,
 };
 const otro: Miembro = {
   id: "u2",
@@ -28,6 +32,9 @@ const otro: Miembro = {
   club_id: null,
   rol: "admin",
   activo: true,
+  estado_aprobacion: "aprobado",
+  email: "beto@example.org",
+  email_confirmado: true,
 };
 // Perfil anterior a la migración 003: el nombre completo quedó en `nombre`, sin apellido.
 const antiguo: Miembro = {
@@ -38,10 +45,22 @@ const antiguo: Miembro = {
   club_id: null,
   rol: "miembro",
   activo: true,
+  estado_aprobacion: "aprobado",
+  email: "carla@example.org",
+  email_confirmado: true,
 };
 const clubs = [{ id: "c1", nombre: "Rotary Club Panamá", tipo: "rotary" as const }];
+const pendiente: Miembro = {
+  ...otro, id: "u4", nombre: "Diana", nombre_completo: "Diana Ruiz",
+  rol: "miembro", activo: false, estado_aprobacion: "pendiente",
+  email: "diana@example.org", email_confirmado: false,
+};
 
 describe("reglas de miembros", () => {
+  it("explica cómo resolver un rechazo de aprobación en Postgres", () => {
+    expect(adminErrorMessage({ code: "23514" })).toMatch(/Recarga la aplicación/);
+  });
+
   it("bloquea que un admin se quite el rol o se desactive a sí mismo", () => {
     expect(bloqueoPropio("u1", yo, { rol: "miembro" })?.title).toMatch(/quitarte el rol/);
     expect(bloqueoPropio("u1", yo, { activo: false })?.title).toMatch(/desactivar tu propio acceso/);
@@ -54,6 +73,8 @@ describe("reglas de miembros", () => {
     expect(confirmacionNecesaria(otro, { rol: "miembro" })?.confirmLabel).toBe("Quitar rol");
     expect(confirmacionNecesaria(otro, { activo: true })).toBeNull();
     expect(confirmacionNecesaria(otro, { club_id: "c1" })).toBeNull();
+    expect(confirmacionNecesaria(pendiente, { estado_aprobacion: "aprobado", activo: true })?.confirmLabel).toBe("Aprobar solicitud");
+    expect(confirmacionNecesaria(pendiente, { estado_aprobacion: "rechazado", activo: false })?.confirmLabel).toBe("Rechazar solicitud");
   });
 
   it("ordena por nombre y apellido con los vacíos al final", () => {
@@ -95,6 +116,7 @@ let filas: Miembro[] = [];
 
 function fakeClient() {
   return {
+    rpc: async () => ({ data: filas, error: null }),
     from(tabla: string) {
       if (tabla === "clubs") {
         return { select: () => ({ order: async () => ({ data: clubs, error: null }) }) };
@@ -144,7 +166,7 @@ describe("MembersAdmin", () => {
     expect(screen.getByRole("link", { name: "Volver al mapa" })).toHaveAttribute("href", "/");
   });
 
-  it("lista los miembros con nombre y apellido, club, rol y acceso, sin emails", async () => {
+  it("lista los miembros con nombre, club, rol, acceso y correo solo en admin", async () => {
     render(<MembersAdmin />);
     const lista = await screen.findByRole("list", { name: "Lista de miembros" });
     const items = within(lista).getAllByRole("listitem");
@@ -157,8 +179,8 @@ describe("MembersAdmin", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.getByText(/Cada persona crea su cuenta en la pantalla de registro/)).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/@/);
+    expect(screen.getByText(/Las cuentas nuevas esperan aprobación/)).toBeInTheDocument();
+    expect(within(items[0]).getByText("ana@example.org")).toBeInTheDocument();
   });
 
   it("impide que el admin se desactive a sí mismo y no envía nada", async () => {
@@ -192,6 +214,32 @@ describe("MembersAdmin", () => {
       "false",
     );
     expect(toastSuccess).toHaveBeenCalledWith("Acceso de Beto Ruiz desactivado.");
+  });
+
+  it("aprueba una solicitud y la mueve a miembros aprobados conservando el correo", async () => {
+    filas = [yo, pendiente];
+    render(<MembersAdmin />);
+    const lista = await screen.findByRole("list", { name: "Solicitudes pendientes" });
+    expect(within(lista).getByText("diana@example.org")).toBeInTheDocument();
+    expect(within(lista).getByText("Correo sin confirmar")).toBeInTheDocument();
+    await userEvent.click(within(lista).getByRole("button", { name: "Aprobar" }));
+    const dialogo = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Aprobar solicitud" }));
+    expect(updates).toEqual([{ id: "u4", cambio: { estado_aprobacion: "aprobado", activo: true } }]);
+    expect(within(screen.getByRole("list", { name: "Lista de miembros" })).getByText("diana@example.org")).toBeInTheDocument();
+  });
+
+  it("rechaza sin borrar y permite reconsiderar la solicitud", async () => {
+    filas = [yo, pendiente];
+    render(<MembersAdmin />);
+    await userEvent.click(within(await screen.findByRole("list", { name: "Solicitudes pendientes" })).getByRole("button", { name: "Rechazar" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Rechazar solicitud" }));
+    expect(updates).toEqual([{ id: "u4", cambio: { estado_aprobacion: "rechazado", activo: false } }]);
+    const rechazados = screen.getByRole("list", { name: "Solicitudes rechazadas" });
+    expect(within(rechazados).getByText("diana@example.org")).toBeInTheDocument();
+    await userEvent.click(within(rechazados).getByRole("button", { name: "Aprobar ahora" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Aprobar solicitud" }));
+    expect(updates[1]).toEqual({ id: "u4", cambio: { estado_aprobacion: "aprobado", activo: true } });
   });
 
   it("cambia el club sin confirmación", async () => {

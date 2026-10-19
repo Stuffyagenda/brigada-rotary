@@ -224,7 +224,7 @@ export function RegistroForm() {
         <h1 ref={enviadoRef} tabIndex={-1} className="text-lg font-bold outline-none">
           Revisa tu correo
         </h1>
-        <p>Te enviamos un correo para confirmar tu cuenta. Ábrelo y luego inicia sesión.</p>
+        <p>Te enviamos un correo para confirmar tu cuenta. Después de confirmarla, un administrador revisará tu solicitud antes de darte acceso.</p>
         <p className="text-ink-soft">
           Lo enviamos a <span className="font-semibold break-all text-ink">{enviadoA}</span>. Si no llega en unos
           minutos, revisa la carpeta de spam.
@@ -252,7 +252,7 @@ export function RegistroForm() {
   return (
     <>
       <h1 className="mb-1 text-lg font-bold">Crea tu cuenta</h1>
-      <p className="mb-6 text-ink-soft">Para brigadistas de Rotary y Rotaract. Tu cuenta queda activa al instante.</p>
+      <p className="mb-6 text-ink-soft">Para brigadistas de Rotary y Rotaract. Un administrador aprobará tu solicitud antes de darte acceso.</p>
 
       <form onSubmit={onSubmit} noValidate aria-busy={pending} className="flex flex-col gap-5">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

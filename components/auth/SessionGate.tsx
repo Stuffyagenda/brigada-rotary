@@ -10,7 +10,15 @@ import { LOGIN_PATH, loginUrl } from "@/lib/auth/redirect";
 import { hasSupabaseEnv } from "@/lib/env";
 
 /** Qué muestra el guard según el estado de la sesión. Función pura. */
-export type GateView = "loading" | "redirect" | "inactive" | "no-profile" | "app";
+export type GateView =
+  | "loading"
+  | "redirect"
+  | "pending"
+  | "rejected"
+  | "inactive"
+  | "no-profile"
+  | "approval-unavailable"
+  | "app";
 
 export function gateView({
   status,
@@ -18,11 +26,19 @@ export function gateView({
   offline,
 }: Pick<ProfileContextValue, "status" | "profile" | "offline">): GateView {
   if (status === "signed-out") return "redirect";
+  if (
+    profile &&
+    !["pendiente", "aprobado", "rechazado"].includes(profile.estado_aprobacion)
+  ) {
+    return "approval-unavailable";
+  }
+  if (profile?.estado_aprobacion === "pendiente") return "pending";
+  if (profile?.estado_aprobacion === "rechazado") return "rejected";
   if (profile && !profile.activo) return "inactive";
   // Mientras se confirma la sesión, se entra con el perfil guardado (offline-first).
   if (status === "loading") return profile ? "app" : "loading";
   // Con red y sesión pero sin perfil: usuario borrado o perfil sin crear.
-  if (!profile && !offline) return "no-profile";
+  if (!profile) return offline ? "loading" : "no-profile";
   return "app";
 }
 
@@ -75,6 +91,20 @@ export function SessionGate({ children }: { children: ReactNode }) {
   }, [view, pathname, router]);
 
   if (view === "app") return <>{children}</>;
+  if (view === "pending") {
+    return <AccessBlocked title="Tu solicitud está pendiente de aprobación." body="Un administrador revisará tu cuenta. Vuelve a entrar más tarde." />;
+  }
+  if (view === "rejected") {
+    return <AccessBlocked title="Tu solicitud fue rechazada." body="Habla con un administrador de tu club si necesitas que revisen la decisión." />;
+  }
+  if (view === "approval-unavailable") {
+    return (
+      <AccessBlocked
+        title="No pudimos verificar tu solicitud."
+        body="El sistema no pudo comprobar el estado de aprobación de tu cuenta. Contacta a un administrador para revisar la configuración."
+      />
+    );
+  }
   if (view === "inactive") {
     return (
       <AccessBlocked

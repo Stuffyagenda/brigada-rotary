@@ -177,6 +177,7 @@ describe("caché del perfil en Dexie", () => {
     club_id: null,
     rol: "admin",
     activo: true,
+    estado_aprobacion: "aprobado",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   };
@@ -196,6 +197,16 @@ describe("caché del perfil en Dexie", () => {
 
   it("ignora valores con forma inválida", async () => {
     await db.meta.put({ key: PERFIL_KEY, value: { userId: "u2", profile, savedAt: "x" } });
+    expect(await readPerfilCache()).toBeNull();
+  });
+
+  it("no autoriza sin red una caché anterior a la migración de aprobación", async () => {
+    const perfilAntiguo: Partial<Profile> = { ...profile };
+    delete perfilAntiguo.estado_aprobacion;
+    await db.meta.put({
+      key: PERFIL_KEY,
+      value: { userId: "u1", email: "ana@example.org", profile: perfilAntiguo, club: null, savedAt: "x" },
+    });
     expect(await readPerfilCache()).toBeNull();
   });
 });

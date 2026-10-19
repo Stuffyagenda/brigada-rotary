@@ -23,6 +23,7 @@ const profile: Profile = {
   club_id: "c1",
   rol: "miembro",
   activo: true,
+  estado_aprobacion: "aprobado",
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };
@@ -128,6 +129,7 @@ describe("esAdminActivo", () => {
   it("solo es admin con rol admin y activo", () => {
     expect(esAdminActivo({ ...profile, rol: "admin" })).toBe(true);
     expect(esAdminActivo({ ...profile, rol: "admin", activo: false })).toBe(false);
+    expect(esAdminActivo({ ...profile, rol: "admin", estado_aprobacion: "pendiente" })).toBe(false);
     expect(esAdminActivo(profile)).toBe(false);
     expect(esAdminActivo(null)).toBe(false);
   });
