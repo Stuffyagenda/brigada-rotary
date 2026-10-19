@@ -1,0 +1,4 @@
+# Datos reales de familias afectadas (nombres, teléfonos, ubicaciones). Nunca subir.
+supabase/seed.sql
+*.xlsx
+.DS_Store
