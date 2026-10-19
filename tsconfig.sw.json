@@ -1,0 +1,12 @@
+{
+  "//": "Service worker (app/sw.ts): se comprueba aparte con lib webworker para no mezclar sus tipos con los de dom.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["esnext", "webworker"],
+    "types": [],
+    "incremental": false,
+    "plugins": []
+  },
+  "include": ["app/sw.ts"],
+  "exclude": []
+}

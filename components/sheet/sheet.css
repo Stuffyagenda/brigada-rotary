@@ -1,0 +1,24 @@
+/* Panel inferior (móvil) y columna (escritorio). */
+
+.sheet-drawer {
+  /* La curva y la duración de Vaul ya son --ease-drawer (0.32, 0.72, 0, 1). */
+  box-shadow:
+    0 -1px 0 rgb(28 39 51 / 0.06),
+    0 -8px 24px rgb(28 39 51 / 0.14);
+}
+
+/* Movimiento reducido: sin desplazamiento; el contenido aparece con un fundido. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-fade {
+    animation: fade-in 200ms var(--ease-out);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

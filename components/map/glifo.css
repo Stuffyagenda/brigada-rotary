@@ -1,0 +1,74 @@
+/*
+ * Glifo de vigencia: la misma forma que el pin del mapa, para chips, listas y
+ * registros. Forma + color, nunca solo color:
+ * - pendiente: círculo relleno rojo
+ * - reciente: anillo verde
+ * - por-vencer: anillo naranja grueso con punto central
+ * - vencido: rombo negro
+ */
+
+.glifo {
+  --glifo: 14px;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--glifo);
+  height: var(--glifo);
+  border-radius: 9999px;
+}
+
+.glifo[data-tamano="sm"] {
+  --glifo: 12px;
+}
+
+.glifo[data-tamano="lg"] {
+  --glifo: 18px;
+}
+
+.glifo[data-vigencia="pendiente"] {
+  background-color: var(--color-pending);
+}
+
+.glifo[data-vigencia="reciente"] {
+  border: calc(var(--glifo) * 0.25) solid var(--color-done);
+  background-color: var(--color-white);
+}
+
+.glifo[data-vigencia="por-vencer"] {
+  border: calc(var(--glifo) * 0.22) solid var(--color-aging);
+  background-color: var(--color-white);
+}
+
+/* Punto central del anillo "por vencer". */
+.glifo[data-vigencia="por-vencer"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(var(--glifo) * 0.3);
+  height: calc(var(--glifo) * 0.3);
+  border-radius: 9999px;
+  background-color: var(--color-aging);
+}
+
+/*
+ * Rombo: un cuadrado girado 45°, del mismo tamaño visual que los círculos.
+ * Se dibuja en ::after para que la caja del glifo (y sus márgenes de
+ * utilidades como `mt-1.5`) sea igual que en las demás vigencias.
+ */
+.glifo[data-vigencia="vencido"] {
+  border-radius: 0;
+}
+
+.glifo[data-vigencia="vencido"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: calc(var(--glifo) * 0.76);
+  height: calc(var(--glifo) * 0.76);
+  border-radius: 1.5px;
+  background-color: var(--color-stale);
+  rotate: 45deg;
+}

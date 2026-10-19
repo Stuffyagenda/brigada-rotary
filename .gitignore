@@ -1,0 +1,47 @@
+# Datos reales de familias afectadas (nombres, teléfonos, ubicaciones). Nunca subir.
+supabase/seed.sql
+*.xlsx
+.DS_Store
+
+# Alias de Finder
+*.fileloc
+
+# Worktrees locales de herramientas
+.claude/worktrees/
+
+# Dependencias
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# Service worker generado por Serwist
+public/sw*.js
+public/sw*.js.map
+public/swe-worker*.js
+public/swe-worker*.js.map
+
+# Variables de entorno
+.env
+.env*.local
+
+# Tests
+/coverage
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
+# Varios
+*.pem
+.vercel
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

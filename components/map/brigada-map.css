@@ -1,0 +1,57 @@
+/* Estilos puntuales del mapa (Leaflet). */
+
+.brm-root {
+  /* Alto ocupado abajo por el panel (móvil): los controles de Leaflet quedan encima. */
+  --map-bottom-inset: 0px;
+  position: absolute;
+  inset: 0;
+  /* Los z-index de Leaflet (400-1000) quedan dentro del mapa, bajo la barra y el panel. */
+  isolation: isolate;
+  z-index: 0;
+  background-color: var(--color-map-bg);
+}
+
+.brm-root .leaflet-container {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-sans);
+  background-color: var(--color-map-bg);
+}
+
+.brm-root .leaflet-bottom {
+  bottom: var(--map-bottom-inset);
+}
+
+.brm-root .leaflet-control-attribution {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  background-color: rgb(255 255 255 / 0.85);
+  border-top-left-radius: 6px;
+  padding: 1px 6px;
+}
+
+.brm-root .leaflet-control-attribution a {
+  color: var(--color-ink);
+}
+
+.brm-picking .leaflet-container,
+.brm-picking .leaflet-interactive {
+  cursor: crosshair;
+}
+
+/* Pin: escala al seleccionarse (scale 1.25, 180 ms). */
+.brm-pin {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: scale 180ms var(--ease-out);
+}
+
+.brm-pinSelected {
+  scale: 1.25;
+}
+
+/* Área táctil invisible de cada pin (≥ 44 px). */
+.brm-hit {
+  cursor: pointer;
+}
