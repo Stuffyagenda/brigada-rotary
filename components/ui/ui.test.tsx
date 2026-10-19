@@ -53,6 +53,9 @@ describe("YesNo", () => {
     fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
     expect(screen.getByRole("radio", { name: "No" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "No" })).toHaveFocus();
+    // Con dos opciones cualquier flecha alterna (patrón WAI-ARIA).
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    expect(screen.getByRole("radio", { name: "Sí" })).toHaveAttribute("aria-checked", "true");
   });
 });
 
@@ -66,7 +69,10 @@ describe("Counter", () => {
     render(<CounterControlado />);
     const input = screen.getByLabelText("Adultos (18 a 59)");
     const menos = screen.getByRole("button", { name: /Restar uno/ });
-    expect(menos).toBeDisabled();
+    // En el límite no se deshabilita (no pierde el foco), solo se marca y no hace nada.
+    expect(menos).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(menos);
+    expect(input).toHaveValue(0);
     await userEvent.click(screen.getByRole("button", { name: /Sumar uno/ }));
     await userEvent.click(screen.getByRole("button", { name: /Sumar uno/ }));
     expect(input).toHaveValue(2);

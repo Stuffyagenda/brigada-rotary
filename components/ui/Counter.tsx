@@ -52,8 +52,9 @@ export function Counter({
           variant="secondary"
           size="icon"
           aria-label={`Restar uno: ${label}`}
-          disabled={disabled || value <= min}
-          onClick={() => set(value - 1)}
+          disabled={disabled}
+          aria-disabled={value <= min || undefined}
+          onClick={() => value > min && set(value - 1)}
         >
           <Minus aria-hidden="true" className="size-5" />
         </Button>
@@ -69,14 +70,15 @@ export function Counter({
           disabled={disabled}
           onChange={(e) => onChange(clampCount(e.target.value, min, max))}
           onFocus={(e) => e.target.select()}
-          className="h-11 w-14 rounded-lg border border-line bg-white text-center text-lg font-semibold tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="h-11 w-14 rounded-lg border border-ink-soft bg-white text-center text-lg font-semibold tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <Button
           variant="secondary"
           size="icon"
           aria-label={`Sumar uno: ${label}`}
-          disabled={disabled || value >= max}
-          onClick={() => set(value + 1)}
+          disabled={disabled}
+          aria-disabled={value >= max || undefined}
+          onClick={() => value < max && set(value + 1)}
         >
           <Plus aria-hidden="true" className="size-5" />
         </Button>

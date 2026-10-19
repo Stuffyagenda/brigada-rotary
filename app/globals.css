@@ -36,7 +36,13 @@
   --color-pending-tint: #fbe8eb;
   --color-done: #0e7c47; /* estado ATENDIDO */
   --color-done-tint: #e4f3eb;
+  /* Vigencia de la atención (lib/vigencia.ts). Nunca solo color: el pin cambia de forma. */
+  --color-aging: #b45309; /* ATENDIDO hace 4–6 días. Blanco sobre aging 5.02:1; aging sobre white 5.02:1, sobre paper 4.64:1 */
+  --color-aging-tint: #fef3e6; /* fondo suave de aging. ink encima 13.82:1, ink-soft 6.47:1, aging 4.59:1 */
+  --color-stale: #000000; /* ATENDIDO hace 7+ días. Blanco sobre stale 21:1; stale sobre paper 19.38:1 */
   --color-line: #d5dce3; /* divisores */
+  --color-pending-strong: #7a0a1d; /* relleno de "mantén pulsado para borrar" */
+  --color-map-bg: #e6eaee; /* fondo del mapa mientras cargan las teselas */
 
   /* Tipografía: base 17 px, escala 1.25 (13.6 / 17 / 21.25 / 26.5 / 33). */
   --text-*: initial;
@@ -105,10 +111,11 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Foco visible: anillo gold en todos los elementos interactivos. */
+  /* Foco visible: anillo gold con borde ink para contraste ≥ 3:1 sobre cualquier fondo claro. */
   :focus-visible {
     outline: 3px solid var(--color-gold);
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--color-ink);
   }
 
   :focus:not(:focus-visible) {
@@ -130,6 +137,8 @@
   *::before,
   *::after {
     transition-property: opacity, color, background-color, border-color, outline-color, fill, stroke !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
 }

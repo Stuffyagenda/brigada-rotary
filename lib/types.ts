@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import type { Tables, TablesInsert } from "@/lib/database.types";
+import { esFechaFutura, hoyPanama } from "@/lib/vigencia";
 
 // ---------------------------------------------------------------------------
 // Uniones literales (checks de supabase/schema.sql)
@@ -59,8 +60,39 @@ export type ReporteInsert = Omit<ReporteInsertRow, "estado" | "prioridad" | "dan
  */
 export type ReporteUpsert = Omit<Reporte, "total_personas" | "created_by" | "updated_by">;
 
+/**
+ * Perfil de un miembro. `nombre` y `apellido` (migración 003) vienen del
+ * registro; en los perfiles anteriores `nombre` tiene el nombre completo y
+ * `apellido` es null. `nombre_completo` sigue siendo el nombre visible.
+ */
 export type Profile = Omit<Tables<"profiles">, "rol"> & { rol: Rol };
 export type Club = Omit<Tables<"clubs">, "tipo"> & { tipo: TipoClub };
+
+/** Club tal como lo devuelve `rpc('clubs_publicos')` (accesible sin sesión, para el registro). */
+export type ClubPublico = { id: string; nombre: string; tipo: TipoClub };
+
+// ---------------------------------------------------------------------------
+// Vigencia de la atención (ver lib/vigencia.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Vigencia de un reporte según los días desde la última atención (`attended_at`):
+ * `pendiente` (PENDIENTE), `reciente` (0–3 días), `por-vencer` (4–6), `vencido` (≥ 7).
+ */
+export type Vigencia = "pendiente" | "reciente" | "por-vencer" | "vencido";
+
+// ---------------------------------------------------------------------------
+// Visitas (entregas posteriores a un reporte ya registrado)
+// ---------------------------------------------------------------------------
+
+/** Fila de `public.visitas`. `fecha` es `YYYY-MM-DD` (Panamá); `visitado_at`, ISO 8601. */
+export type Visita = Tables<"visitas">;
+
+/**
+ * Lo que se envía a `supabase.from('visitas').upsert(...)`.
+ * `created_by` lo pone el trigger `set_visita_audit`.
+ */
+export type VisitaUpsert = Omit<Visita, "created_by">;
 
 // ---------------------------------------------------------------------------
 // Etiquetas visibles
@@ -192,6 +224,16 @@ const conteo = z.number().int("Debe ser un número entero").min(0, "No puede ser
 const textoOpcional = z.string().nullish();
 
 /**
+ * Fecha de calendario `YYYY-MM-DD` que no puede ser posterior a hoy en Panamá.
+ * (El SQL tolera un día más por los relojes de los celulares.)
+ */
+export function fechaNoFuturaSchema(mensajeFutura: string) {
+  return z.iso
+    .date("Escribe una fecha válida.")
+    .refine((f) => !esFechaFutura(f), { message: mensajeFutura });
+}
+
+/**
  * Validación de un reporte antes de guardarlo (formulario y motor de sync).
  * Replica los `check` de `public.reportes`, incluida la coherencia
  * `(estado = 'ATENDIDO') = (attended_at is not null)`.
@@ -200,8 +242,10 @@ export const reporteSchema = z
   .object({
     /** UUID generado en el celular; si falta, `saveReport` lo genera. */
     id: z.uuid().optional(),
-    created_at: z.string().optional(),
-    attended_at: z.string().nullish(),
+    created_at: z.iso.datetime({ offset: true }).optional(),
+    /** Fecha del reporte (`YYYY-MM-DD`, Panamá). Por defecto hoy; no puede ser futura. */
+    fecha_reporte: fechaNoFuturaSchema("La fecha del reporte no puede ser futura."),
+    attended_at: z.preprocess((v) => (v === "" ? null : v), z.iso.datetime({ offset: true }).nullish()),
     club_id: z.uuid().nullish(),
     brigadista_texto: textoOpcional,
 
@@ -247,7 +291,7 @@ export const reporteSchema = z
     ent_otros: z.array(z.string()),
     observaciones_atencion: textoOpcional,
   })
-  .refine((r) => (r.estado === "ATENDIDO") === (r.attended_at != null && r.attended_at !== ""), {
+  .refine((r) => (r.estado === "ATENDIDO") === (r.attended_at != null), {
     message: "Un reporte ATENDIDO debe tener fecha de atención y uno PENDIENTE no.",
     path: ["attended_at"],
   });
@@ -256,13 +300,15 @@ export const reporteSchema = z
 export type ReporteInput = z.infer<typeof reporteSchema>;
 
 /**
- * Reporte nuevo con los mismos defaults que el SQL, en la ubicación indicada.
+ * Reporte nuevo con los mismos defaults que el SQL, en la ubicación indicada
+ * (`fecha_reporte` = hoy en Panamá respecto a `ahora`).
  * Devuelve siempre un objeto nuevo (los arrays no se comparten).
  */
-export function reporteVacio(lat: number, lng: number): ReporteInput {
+export function reporteVacio(lat: number, lng: number, ahora: Date = new Date()): ReporteInput {
   return {
     lat,
     lng,
+    fecha_reporte: hoyPanama(ahora),
     attended_at: null,
     brigadista_texto: null,
     estado: "PENDIENTE",
@@ -304,4 +350,73 @@ export function reporteVacio(lat: number, lng: number): ReporteInput {
 /** Suma de personas (igual que la columna generada `total_personas`). */
 export function totalPersonas(r: Pick<ReporteInput, "adultos" | "adultos_mayores" | "menores">): number {
   return (r.adultos || 0) + (r.adultos_mayores || 0) + (r.menores || 0);
+}
+
+// ---------------------------------------------------------------------------
+// Esquema de validación de visitas
+// ---------------------------------------------------------------------------
+
+/** Mensaje cuando una visita no tiene ninguna entrega ni observación. */
+export const MSG_VISITA_VACIA = "Marca al menos una entrega o escribe una observación.";
+
+/**
+ * Validación de una visita antes de guardarla (formulario y `saveVisita`).
+ * - `fecha`: `YYYY-MM-DD`, no futura (Panamá).
+ * - Al menos una entrega (`ent_*` o `ent_otros`) u observación no vacía; si no,
+ *   error `MSG_VISITA_VACIA` en la ruta `["entregas"]` (no es un campo: el
+ *   formulario lo muestra sobre la sección de entregas).
+ * - `id` y `visitado_at` son opcionales: `saveVisita` los genera
+ *   (`visitado_at` = la fecha de la visita con la hora actual de Panamá).
+ */
+export const visitaSchema = z
+  .object({
+    /** UUID generado en el celular; si falta, `saveVisita` lo genera. */
+    id: z.uuid().optional(),
+    reporte_id: z.uuid(),
+    fecha: fechaNoFuturaSchema("La fecha de la visita no puede ser futura."),
+    visitado_at: z.iso.datetime({ offset: true }).optional(),
+    brigadista_texto: textoOpcional,
+    ent_agua: z.boolean(),
+    ent_kit_alimento: z.boolean(),
+    ent_kit_higiene: z.boolean(),
+    ent_lona: z.boolean(),
+    ent_camping: z.boolean(),
+    ent_toldas: z.boolean(),
+    ent_colchonetas: z.boolean(),
+    ent_otros: z.array(z.string()),
+    observaciones: textoOpcional,
+  })
+  .refine(
+    (v) =>
+      INSUMOS.some((i) => v[i.entColumna]) ||
+      v.ent_otros.length > 0 ||
+      (v.observaciones ?? "").trim() !== "",
+    { message: MSG_VISITA_VACIA, path: ["entregas"] },
+  );
+
+/** Datos de una visita tal como los produce el formulario (salida de `visitaSchema`). */
+export type VisitaInput = z.infer<typeof visitaSchema>;
+
+/**
+ * Visita nueva para un reporte: fecha de hoy (Panamá), sin entregas ni observaciones.
+ * (No pasa `visitaSchema` hasta marcar una entrega u observación.)
+ */
+export function visitaVacia(
+  reporteId: string,
+  opciones: { brigadista?: string | null; ahora?: Date } = {},
+): VisitaInput {
+  return {
+    reporte_id: reporteId,
+    fecha: hoyPanama(opciones.ahora),
+    brigadista_texto: opciones.brigadista ?? null,
+    ent_agua: false,
+    ent_kit_alimento: false,
+    ent_kit_higiene: false,
+    ent_lona: false,
+    ent_camping: false,
+    ent_toldas: false,
+    ent_colchonetas: false,
+    ent_otros: [],
+    observaciones: null,
+  };
 }

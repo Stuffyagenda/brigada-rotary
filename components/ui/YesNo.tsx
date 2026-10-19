@@ -3,22 +3,22 @@
 import { useRef, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 
-export interface YesNoProps {
+/** El grupo necesita nombre accesible: `label` o `aria-labelledby`. */
+type YesNoName = { label: string; "aria-labelledby"?: string } | { label?: string; "aria-labelledby": string };
+
+export type YesNoProps = YesNoName & {
   value: boolean;
   onChange: (value: boolean) => void;
-  /** Nombre accesible del grupo (si no se usa `aria-labelledby`). */
-  label?: string;
-  "aria-labelledby"?: string;
   yesLabel?: string;
   noLabel?: string;
   disabled?: boolean;
   className?: string;
-}
+};
 
 /**
  * Interruptor Sí/No como control segmentado (`role="radiogroup"`).
  * El marcador se desplaza con `translateX` (150 ms, interrumpible).
- * Teclado: flechas para cambiar, Tab entra en la opción marcada.
+ * Teclado: las flechas alternan; Tab entra en la opción marcada.
  */
 export function YesNo({
   value,
@@ -40,12 +40,10 @@ export function YesNo({
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (["ArrowLeft", "ArrowUp"].includes(e.key)) {
+    // Patrón WAI-ARIA de radio: con dos opciones, cualquier flecha alterna.
+    if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key)) {
       e.preventDefault();
-      select(true);
-    } else if (["ArrowRight", "ArrowDown"].includes(e.key)) {
-      e.preventDefault();
-      select(false);
+      select(!value);
     }
   };
 

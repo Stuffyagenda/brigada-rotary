@@ -5,10 +5,8 @@ import type { NextConfig } from "next";
  *
  * Service worker (Serwist): se usa el "modo configurador" de `@serwist/next`,
  * compatible con Turbopack. No requiere plugin en este archivo: la configuración
- * vive en `serwist.config.mjs` y el SW se genera con `serwist build` después de
- * `next build` (script `build:sw`).
- * TODO(sync-offline): crear `app/sw.ts` y cambiar el script `build` a
- * `next build && serwist build`.
+ * vive en `serwist.config.mjs` y el SW (`app/sw.ts` → `public/sw.js`) se genera
+ * con `serwist build` justo después de `next build` (script `build`).
  */
 const nextConfig: NextConfig = {
   // Cache Components / Partial Prefetching desactivados: la app es offline-first

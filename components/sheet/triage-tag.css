@@ -1,0 +1,110 @@
+/*
+ * Ficha de triaje: franja lateral del color del estado, separada del cuerpo por
+ * un borde perforado (muescas arriba y abajo + agujeros), y el sello de estado.
+ */
+
+.ficha-wrap {
+  /* La sombra sigue la silueta recortada por la máscara. */
+  filter: drop-shadow(0 1px 1px rgb(28 39 51 / 0.08)) drop-shadow(0 8px 18px rgb(28 39 51 / 0.1));
+}
+
+.ficha-tag {
+  --stripe: 60px;
+  --notch: 9px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--stripe) minmax(0, 1fr);
+  border-radius: 12px;
+  overflow: hidden;
+  /* Muescas semicirculares en la línea de corte, arriba y abajo. */
+  -webkit-mask:
+    radial-gradient(circle var(--notch) at var(--stripe) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--notch) at var(--stripe) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle var(--notch) at var(--stripe) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--notch) at var(--stripe) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+}
+
+@media (min-width: 640px) {
+  .ficha-tag {
+    --stripe: 68px;
+  }
+}
+
+.ficha-stripe {
+  position: relative;
+  color: var(--color-white);
+  background-color: var(--color-pending);
+  transition: background-color 220ms var(--ease-out);
+}
+
+.ficha-tag[data-estado="ATENDIDO"] .ficha-stripe {
+  background-color: var(--color-done);
+}
+
+/* Agujeros de la línea de corte: del color del panel, sobre la unión franja/cuerpo. */
+.ficha-perforation {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--notch) + 6px);
+  bottom: calc(var(--notch) + 6px);
+  left: calc(var(--stripe) - 4px);
+  width: 8px;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 4px 4px, var(--color-paper) 0 2.6px, #0000 3px);
+  background-size: 8px 12px;
+  background-repeat: repeat-y;
+}
+
+.ficha-body {
+  min-width: 0;
+  background-color: var(--color-white);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  border-radius: 0 12px 12px 0;
+}
+
+/* Sello: texto vertical, de arriba abajo, dentro de un marco como un sello de goma. */
+.ficha-stamp {
+  position: relative;
+  display: grid;
+  writing-mode: vertical-rl;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  padding: 10px 2px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.ficha-stamp > span {
+  grid-area: 1 / 1;
+  transition:
+    opacity 220ms var(--ease-out),
+    filter 220ms var(--ease-out);
+}
+
+/* Cambio de sello al pasar a ATENDIDO: el saliente se desenfoca y se desvanece. */
+.ficha-stamp > span[data-visible="false"] {
+  opacity: 0;
+  filter: blur(2px);
+}
+
+/* Glifo de estado (la misma forma que el pin del mapa): relleno = pendiente, anillo = atendido. */
+.ficha-glyph {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid var(--color-white);
+  background-color: var(--color-white);
+}
+
+.ficha-tag[data-estado="ATENDIDO"] .ficha-glyph {
+  border-width: 4px;
+  background-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ficha-stamp > span[data-visible="false"] {
+    filter: none;
+  }
+}

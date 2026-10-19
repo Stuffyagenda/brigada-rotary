@@ -1,0 +1,60 @@
+/*
+ * Animaciones del AlertDialog (plan § 3): entrada scale(0.96) + opacidad en
+ * 200 ms --ease-out; salida en 150 ms. Radix espera a la animación de salida.
+ * Movimiento reducido: solo opacidad.
+ *
+ * CSS global con prefijo `rf-dialog-` (no es un CSS module: la regla de
+ * Turbopack de next.config.ts procesa todo *.css como global).
+ */
+.rf-dialog-content {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.rf-dialog-overlay[data-state="open"] {
+  animation: rf-dialog-fadeIn 200ms var(--ease-out);
+}
+.rf-dialog-overlay[data-state="closed"] {
+  animation: rf-dialog-fadeOut 150ms var(--ease-out);
+}
+
+.rf-dialog-content[data-state="open"] {
+  animation: rf-dialog-contentIn 200ms var(--ease-out);
+}
+.rf-dialog-content[data-state="closed"] {
+  animation: rf-dialog-contentOut 150ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-dialog-content[data-state="open"] {
+    animation-name: rf-dialog-fadeIn;
+  }
+  .rf-dialog-content[data-state="closed"] {
+    animation-name: rf-dialog-fadeOut;
+  }
+}
+
+@keyframes rf-dialog-fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rf-dialog-fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes rf-dialog-contentIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+@keyframes rf-dialog-contentOut {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}

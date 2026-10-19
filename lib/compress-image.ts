@@ -20,7 +20,14 @@ export const MENSAJES_FOTO = {
   muyGrande: "La imagen original supera 15 MB. Selecciona otra más pequeña.",
   noSePudoLeer: "No se pudo leer la imagen.",
   noSePudoProcesar: "No se pudo procesar la imagen.",
+  noSePudoOptimizar: "No se pudo optimizar la imagen.",
+  optimizando: "Optimizando foto...",
 } as const;
+
+/** Estado tras comprimir, p. ej. "Foto optimizada y lista para guardar (180 KB aprox.)". */
+export function mensajeFotoLista(bytes: number): string {
+  return `Foto optimizada y lista para guardar (${Math.round(bytes / 1024)} KB aprox.)`;
+}
 
 /** Tamaño final manteniendo la proporción, sin ampliar imágenes pequeñas. */
 export function scaledSize(
@@ -55,7 +62,7 @@ function loadImage(file: Blob): Promise<HTMLImageElement> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new ImageCompressionError(MENSAJES_FOTO.noSePudoLeer));
+      reject(new ImageCompressionError(MENSAJES_FOTO.noSePudoProcesar));
     };
     img.src = url;
   });

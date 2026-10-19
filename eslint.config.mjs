@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "index.html",
     "sw.js",
     "supabase/**",
+    ".claude/**",
     // Service worker generado
     "public/sw*.js",
     "public/swe-worker*.js",

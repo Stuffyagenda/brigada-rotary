@@ -1,6 +1,6 @@
 // Tipos de la base de datos de Supabase.
 //
-// Escrito a mano a partir de supabase/schema.sql con el mismo formato que
+// Escrito a mano a partir de supabase/schema.sql y supabase/migrations/*.sql con el mismo formato que
 // `npx supabase gen types typescript --project-id <id> > lib/database.types.ts`.
 // Al regenerarlo, este archivo se sobrescribe por completo: los tipos derivados
 // (uniones literales de los `check`, etc.) viven en lib/types.ts.
@@ -48,27 +48,33 @@ export type Database = {
       profiles: {
         Row: {
           activo: boolean
+          apellido: string | null
           club_id: string | null
           created_at: string
           id: string
+          nombre: string | null
           nombre_completo: string | null
           rol: string
           updated_at: string
         }
         Insert: {
           activo?: boolean
+          apellido?: string | null
           club_id?: string | null
           created_at?: string
           id: string
+          nombre?: string | null
           nombre_completo?: string | null
           rol?: string
           updated_at?: string
         }
         Update: {
           activo?: boolean
+          apellido?: string | null
           club_id?: string | null
           created_at?: string
           id?: string
+          nombre?: string | null
           nombre_completo?: string | null
           rol?: string
           updated_at?: string
@@ -107,6 +113,7 @@ export type Database = {
           ent_otros: string[]
           ent_toldas: boolean
           estado: string
+          fecha_reporte: string
           foto_path: string | null
           foto_url: string | null
           gatos: number
@@ -153,6 +160,7 @@ export type Database = {
           ent_otros?: string[]
           ent_toldas?: boolean
           estado?: string
+          fecha_reporte?: string
           foto_path?: string | null
           foto_url?: string | null
           gatos?: number
@@ -198,6 +206,7 @@ export type Database = {
           ent_otros?: string[]
           ent_toldas?: boolean
           estado?: string
+          fecha_reporte?: string
           foto_path?: string | null
           foto_url?: string | null
           gatos?: number
@@ -244,11 +253,91 @@ export type Database = {
           },
         ]
       }
+      visitas: {
+        Row: {
+          brigadista_texto: string | null
+          created_at: string
+          created_by: string | null
+          ent_agua: boolean
+          ent_camping: boolean
+          ent_colchonetas: boolean
+          ent_kit_alimento: boolean
+          ent_kit_higiene: boolean
+          ent_lona: boolean
+          ent_otros: string[]
+          ent_toldas: boolean
+          fecha: string
+          id: string
+          observaciones: string | null
+          reporte_id: string
+          visitado_at: string
+        }
+        Insert: {
+          brigadista_texto?: string | null
+          created_at?: string
+          created_by?: string | null
+          ent_agua?: boolean
+          ent_camping?: boolean
+          ent_colchonetas?: boolean
+          ent_kit_alimento?: boolean
+          ent_kit_higiene?: boolean
+          ent_lona?: boolean
+          ent_otros?: string[]
+          ent_toldas?: boolean
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          reporte_id: string
+          visitado_at?: string
+        }
+        Update: {
+          brigadista_texto?: string | null
+          created_at?: string
+          created_by?: string | null
+          ent_agua?: boolean
+          ent_camping?: boolean
+          ent_colchonetas?: boolean
+          ent_kit_alimento?: boolean
+          ent_kit_higiene?: boolean
+          ent_lona?: boolean
+          ent_otros?: string[]
+          ent_toldas?: boolean
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          reporte_id?: string
+          visitado_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitas_reporte_id_fkey"
+            columns: ["reporte_id"]
+            isOneToOne: false
+            referencedRelation: "reportes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      clubs_publicos: {
+        Args: never
+        Returns: {
+          id: string
+          nombre: string
+          tipo: string
+        }[]
+      }
       is_active_member: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
     }

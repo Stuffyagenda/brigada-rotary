@@ -36,6 +36,7 @@
     "supabase",
     "index.html",
     "sw.js",
+    "app/sw.ts",
     "public/sw.js",
     "public/swe-worker*.js",
     "playwright-report",

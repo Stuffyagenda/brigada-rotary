@@ -50,4 +50,35 @@ describe("geocode", () => {
   it("ignora el texto vacío", async () => {
     expect(await geocode("  ")).toBeNull();
   });
+
+  it("no consulta Nominatim con teléfonos ni correos", async () => {
+    const fetchImpl = vi.fn(async () => respuesta([{ lat: "8.98", lon: "-79.52" }]));
+    expect(await geocode("6968-0515", { online: true, fetchImpl })).toBeNull();
+    expect(await geocode("+507 6000 0001", { online: true, fetchImpl })).toBeNull();
+    expect(await geocode("ana@correo.test", { online: true, fetchImpl })).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    // Pocos dígitos (calle, casa) sí se buscan.
+    await geocode("Calle 50", { online: true, fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it("no consulta Nominatim con nombres de contactos locales", async () => {
+    const fetchImpl = vi.fn(async () => respuesta([{ lat: "8.98", lon: "-79.52" }]));
+    const excluir = ["Familia Pérez", "Ana María Prueba", null, "Pedro"];
+    expect(await geocode("perez", { online: true, fetchImpl, excluir })).toBeNull();
+    expect(await geocode("Ana María Prueba", { online: true, fetchImpl, excluir })).toBeNull();
+    expect(await geocode("ana prueba", { online: true, fetchImpl, excluir })).toBeNull();
+    expect(await geocode("Familia Pérez Bella Vista", { online: true, fetchImpl, excluir })).toBeNull();
+    expect(await geocode("Pedro", { online: true, fetchImpl, excluir })).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    // Un nombre de una palabra no bloquea un lugar más largo.
+    expect(await geocode("San Pedro", { online: true, fetchImpl, excluir })).not.toBeNull();
+    expect(await geocode("Bella Vista", { online: true, fetchImpl, excluir })).not.toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("los Plus Codes y lugares locales se resuelven aunque coincidan con un contacto", async () => {
+    const r = await geocode("Las Tablas", { online: true, excluir: ["Las Tablas"] });
+    expect(r?.source).toBe("local");
+  });
 });

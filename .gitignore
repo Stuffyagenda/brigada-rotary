@@ -6,6 +6,9 @@ supabase/seed.sql
 # Alias de Finder
 *.fileloc
 
+# Worktrees locales de herramientas
+.claude/worktrees/
+
 # Dependencias
 /node_modules
 /.pnp

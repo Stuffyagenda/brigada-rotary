@@ -19,7 +19,7 @@ const TOLERANCIA_COORD = 0.0000001;
 
 /**
  * Campos que no cuentan como "cambio del formulario": identificadores, fechas
- * automáticas, auditoría, la ubicación (lat/lng y su Plus Code derivado) y los
+ * automáticas (`fecha_reporte` sí cuenta: la elige el brigadista), auditoría, la ubicación (lat/lng y su Plus Code derivado) y los
  * campos locales de sincronización.
  */
 const IGNORADOS = new Set([

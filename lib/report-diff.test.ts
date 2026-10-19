@@ -51,6 +51,11 @@ describe("tipoDeCambio", () => {
     );
   });
 
+  it("cambiar la fecha del reporte cuenta como cambio del formulario", () => {
+    expect(tipoDeCambio(previo, { ...previo, fecha_reporte: "2026-09-30" })).toBe("formulario");
+    expect(tipoDeCambio(previo, { ...previo, lat: 7.97, fecha_reporte: "2026-09-30" })).toBe("ambos");
+  });
+
   it("una foto nueva cuenta como cambio del formulario", () => {
     expect(tipoDeCambio(previo, { ...previo }, { hayFotoNueva: true })).toBe("formulario");
   });
