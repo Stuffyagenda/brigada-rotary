@@ -9,8 +9,8 @@ import { AccionesFicha, TriageTag } from "./TriageTag";
 const AHORA = new Date("2026-10-19T17:00:00Z");
 const ATENDIDO_HACE = {
   reciente: { estado: "ATENDIDO" as const, attended_at: "2026-10-17T15:00:00Z" }, // 2 días
-  porVencer: { estado: "ATENDIDO" as const, attended_at: "2026-10-14T15:00:00Z" }, // 5 días
-  vencido: { estado: "ATENDIDO" as const, attended_at: "2026-10-09T15:00:00Z" }, // 10 días
+  diezDias: { estado: "ATENDIDO" as const, attended_at: "2026-10-09T15:00:00Z" }, // 10 días: sigue reciente
+  vencido: { estado: "ATENDIDO" as const, attended_at: "2026-10-03T15:00:00Z" }, // 16 días
 };
 
 function renderTag(over: Parameters<typeof reporteFicticio>[0] = {}, props: Partial<Parameters<typeof TriageTag>[0]> = {}) {
@@ -95,7 +95,7 @@ describe("TriageTag", () => {
   });
 
   it("no une metadatos con '·' ni usa flechas", () => {
-    renderTag({ brigadista_texto: "Brigadista ficticio", ...ATENDIDO_HACE.porVencer }, { clubNombre: "Club de prueba" });
+    renderTag({ brigadista_texto: "Brigadista ficticio", ...ATENDIDO_HACE.diezDias }, { clubNombre: "Club de prueba" });
     const texto = screen.getByTestId("triage-tag").textContent ?? "";
     expect(texto).not.toContain("·");
     expect(texto).not.toContain("→");
@@ -115,31 +115,28 @@ describe("TriageTag por vigencia", () => {
     renderTag(ATENDIDO_HACE.reciente);
     expect(screen.getByTestId("triage-tag")).toHaveAttribute("data-vigencia", "reciente");
     expect(selloVisible()).toBe("ATENDIDO");
-    expect(screen.queryByTestId("sello-nota")).not.toBeInTheDocument();
     expect(screen.getByText("Atendido hace 2 días")).toBeInTheDocument();
     const visita = screen.getByRole("button", { name: "Registrar nueva visita" });
     expect(visita).toHaveAttribute("data-variant", "secondary");
     expect(visita).toHaveAttribute("data-enfasis", "reciente");
   });
 
-  it("por vencer: franja naranja, sello ATENDIDO con 'hace N días' debajo y visita destacada", () => {
-    renderTag(ATENDIDO_HACE.porVencer);
-    expect(screen.getByTestId("triage-tag")).toHaveAttribute("data-vigencia", "por-vencer");
+  it("a los 10 días sigue verde: ya no hay aviso intermedio de 'por vencer'", () => {
+    renderTag(ATENDIDO_HACE.diezDias);
+    expect(screen.getByTestId("triage-tag")).toHaveAttribute("data-vigencia", "reciente");
     expect(selloVisible()).toBe("ATENDIDO");
-    expect(screen.getByTestId("sello-nota")).toHaveTextContent("hace 5 días");
-    expect(screen.getByText("Atendido hace 5 días")).toBeInTheDocument();
+    expect(screen.getByText("Atendido hace 10 días")).toBeInTheDocument();
     expect(screen.queryByText("Necesita nueva visita")).not.toBeInTheDocument();
     const visita = screen.getByRole("button", { name: "Registrar nueva visita" });
     expect(visita).toHaveAttribute("data-variant", "secondary");
-    expect(visita).toHaveAttribute("data-enfasis", "por-vencer");
-    expect(visita.className).toContain("border-aging");
+    expect(visita.className).not.toContain("aging");
   });
 
-  it("vencido: franja negra, sello REVISITAR, 'Necesita nueva visita' y visita como acción principal", async () => {
+  it("vencido (15+ días): franja verde oscuro, sello REVISITAR, 'Necesita nueva visita' y visita como acción principal", async () => {
     const { onRegistrarVisita } = renderTag(ATENDIDO_HACE.vencido);
     expect(screen.getByTestId("triage-tag")).toHaveAttribute("data-vigencia", "vencido");
     expect(selloVisible()).toBe("REVISITAR");
-    expect(screen.getByText("Atendido hace 10 días")).toBeInTheDocument();
+    expect(screen.getByText("Atendido hace 16 días")).toBeInTheDocument();
     expect(screen.getByText("Necesita nueva visita")).toBeInTheDocument();
     const visita = screen.getByRole("button", { name: "Registrar nueva visita" });
     expect(visita).toHaveAttribute("data-variant", "primary");
@@ -170,7 +167,7 @@ describe("TriageTag por vigencia", () => {
         onEditar={vi.fn()}
         onRegistrarEntrega={vi.fn()}
         onRegistrarVisita={vi.fn()}
-        ahora={new Date("2026-10-25T17:00:00Z")}
+        ahora={new Date("2026-11-01T17:00:00Z")}
       />,
     );
     await act(() => new Promise((r) => requestAnimationFrame(() => r(null))));
@@ -191,8 +188,6 @@ describe("AccionesFicha (barra fija del móvil)", () => {
     rerender(<AccionesFicha vigencia="reciente" {...props} />);
     expect(primaria()).toBeNull();
     expect(screen.getByRole("button", { name: "Registrar nueva visita" })).toBeInTheDocument();
-    rerender(<AccionesFicha vigencia="por-vencer" {...props} />);
-    expect(primaria()).toBeNull();
     rerender(<AccionesFicha vigencia="vencido" {...props} />);
     expect(primaria()).toBe("Registrar nueva visita");
     expect(screen.getByRole("button", { name: "Editar" })).toBeInTheDocument();
@@ -214,15 +209,15 @@ describe("ordenarPendientes", () => {
 });
 
 describe("ordenarVencidos", () => {
-  it("solo los atendidos hace 7 días o más, el más antiguo primero", () => {
-    const hace10 = reporteFicticio(ATENDIDO_HACE.vencido);
+  it("solo los atendidos hace 15 días o más, el más antiguo primero", () => {
+    const hace16 = reporteFicticio(ATENDIDO_HACE.vencido);
     const hace30 = reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-09-19T15:00:00Z" });
     const reciente = reporteFicticio(ATENDIDO_HACE.reciente);
-    const porVencer = reporteFicticio(ATENDIDO_HACE.porVencer);
+    const hace10 = reporteFicticio(ATENDIDO_HACE.diezDias);
     const pendiente = reporteFicticio();
-    expect(ordenarVencidos([hace10, reciente, hace30, porVencer, pendiente], AHORA).map((r) => r.id)).toEqual([
+    expect(ordenarVencidos([hace16, reciente, hace30, hace10, pendiente], AHORA).map((r) => r.id)).toEqual([
       hace30.id,
-      hace10.id,
+      hace16.id,
     ]);
     expect(textoNecesitanVisita(1)).toBe("1 familia necesita nueva visita");
     expect(textoNecesitanVisita(3)).toBe("3 familias necesitan nueva visita");

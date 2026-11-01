@@ -95,6 +95,13 @@ describe("saveReport", () => {
     expect(despues?.attended_at).toBeTruthy();
   });
 
+  it("un ATENDIDO sin attended_at toma la fecha del reporte, no la hora de guardado", async () => {
+    setOnline(false);
+    const { id } = await saveReport({ ...reporteVacio(7.96, -80.43), fecha_reporte: "2026-10-01", estado: "ATENDIDO" });
+    const r = await db.reportes.get(id);
+    expect(fechaPanama(r!.attended_at!)).toBe("2026-10-01");
+  });
+
   it("rechaza datos inválidos sin tocar la base", async () => {
     await expect(saveReport({ ...reporteVacio(7.96, -80.43), adultos: -1 })).rejects.toThrow();
     expect(await db.reportes.count()).toBe(0);
