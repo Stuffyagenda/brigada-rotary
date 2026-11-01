@@ -5,7 +5,7 @@
  * (Vaul en móvil, columna fija en escritorio) con resumen, ficha, formulario
  * o formulario de nueva visita.
  *
- * La vigencia de cada reporte (pendiente, atendido hace 0 a 3, 4 a 6 o 7+ días)
+ * La vigencia de cada reporte (pendiente, atendido hace 0 a 14 o 15+ días)
  * se calcula con `useAhora()`: se renueva cada 10 minutos y al volver a la app.
  *
  * Todo el estado navegable vive en la URL (`?reporte=`, `?editar=1`, `?visita=1`, filtros)

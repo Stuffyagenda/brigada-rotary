@@ -55,29 +55,29 @@ describe("buscarRegistros por vigencia y fecha", () => {
   const vencido = reporteFicticio({
     id: "aaaa0001-0000-4000-8000-000000000010",
     estado: "ATENDIDO",
-    attended_at: "2026-10-09T15:00:00Z",
+    attended_at: "2026-10-02T15:00:00Z", // 17 días
     fecha_reporte: "2026-10-01",
   });
-  const porVencer = reporteFicticio({
+  const reciente = reporteFicticio({
     id: "aaaa0002-0000-4000-8000-000000000011",
     estado: "ATENDIDO",
-    attended_at: "2026-10-14T15:00:00Z",
+    attended_at: "2026-10-14T15:00:00Z", // 5 días
     fecha_reporte: "2026-09-30",
   });
   const pendiente = reporteFicticio({ id: "aaaa0003-0000-4000-8000-000000000012", fecha_reporte: "2026-10-18" });
-  const todos = [vencido, porVencer, pendiente];
+  const todos = [vencido, reciente, pendiente];
 
   it("encuentra por la etiqueta de vigencia y el texto 'Atendido hace N días'", () => {
     expect(buscarRegistros(todos, "revisitar", AHORA)).toEqual([vencido]);
     expect(buscarRegistros(todos, "nueva visita", AHORA)).toEqual([vencido]);
-    expect(buscarRegistros(todos, "7+", AHORA)).toEqual([vencido]);
-    expect(buscarRegistros(todos, "4+ dias", AHORA)).toEqual([porVencer]);
-    expect(buscarRegistros(todos, "hace 5 días", AHORA)).toEqual([porVencer]);
+    expect(buscarRegistros(todos, "15+", AHORA)).toEqual([vencido]);
+    expect(buscarRegistros(todos, "4+ dias", AHORA)).toEqual([]);
+    expect(buscarRegistros(todos, "hace 5 días", AHORA)).toEqual([reciente]);
     expect(buscarRegistros(todos, "pendiente", AHORA)).toEqual([pendiente]);
   });
 
   it("encuentra por la fecha del reporte escrita en texto (no por unos pocos dígitos)", () => {
-    expect(buscarRegistros(todos, "septiembre", AHORA)).toEqual([porVencer]);
+    expect(buscarRegistros(todos, "septiembre", AHORA)).toEqual([reciente]);
     expect(buscarRegistros(todos, "18 de octubre", AHORA)).toEqual([pendiente]);
     expect(buscarRegistros(todos, "18", AHORA)).toEqual([]);
   });
@@ -123,7 +123,7 @@ describe("RegistrosScreen con vigencia", () => {
       id: "bbbb0001-0000-4000-8000-000000000020",
       contacto_nombre: "Familia Vencida",
       estado: "ATENDIDO",
-      attended_at: haceDias(10),
+      attended_at: haceDias(20),
       fecha_reporte: "2026-09-01",
       updated_at: "2026-10-05T00:00:00Z",
     });
@@ -139,13 +139,13 @@ describe("RegistrosScreen con vigencia", () => {
     expect(await screen.findByRole("heading", { name: "Familia Vencida" })).toBeInTheDocument();
     expect(screen.getByText("1 de septiembre de 2026")).toBeInTheDocument();
     const [filaVencida, filaPendiente] = screen.getAllByTestId("fila-vigencia");
-    expect(filaVencida).toHaveTextContent("Atendido hace 10 días, necesita nueva visita");
+    expect(filaVencida).toHaveTextContent("Atendido hace 20 días, necesita nueva visita");
     expect(within(filaVencida).getByTestId("glifo-vencido")).toBeInTheDocument();
     expect(filaPendiente).toHaveTextContent("Pendiente");
     expect(within(filaPendiente).getByTestId("glifo-pendiente")).toBeInTheDocument();
 
     const grupo = screen.getByRole("group", { name: "Filtrar por vigencia de la atención" });
-    await userEvent.click(within(grupo).getByRole("button", { name: /^7\+ días/ }));
+    await userEvent.click(within(grupo).getByRole("button", { name: /^15\+ días/ }));
     expect(await screen.findByText("1 resultado")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Familia Pendiente" })).not.toBeInTheDocument();
 

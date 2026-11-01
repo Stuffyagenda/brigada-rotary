@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Counter } from "@/components/ui/Counter";
 import { useReporte } from "@/hooks/useReportes";
+import { useVisitas } from "@/hooks/useVisitas";
 import { useProfile } from "@/lib/auth/profile";
 import { leerUltimoBrigadista, recordarBrigadista } from "@/lib/brigadista";
 import { cn } from "@/lib/cn";
@@ -15,7 +16,7 @@ import { encodePlusCode, type LatLng } from "@/lib/pluscode";
 import { mensajeConfirmacion } from "@/lib/report-diff";
 import { condicionesMedicasActivas, seccionesVisibles } from "@/lib/report-rules";
 import { saveReport } from "@/lib/sync";
-import { hoyPanama } from "@/lib/vigencia";
+import { formatearFechaLarga, hoyPanama } from "@/lib/vigencia";
 import {
   CONDICIONES_MEDICAS,
   CONTADORES,
@@ -112,6 +113,13 @@ const PRIORIDAD_SEGMENTOS = [
   { value: "BAJA", label: "Baja" },
 ] as const;
 
+/** `true` si los dos textos ISO 8601 son el mismo instante (el servidor puede usar otro formato). */
+function mismoInstante(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ta = Date.parse(a);
+  return Number.isFinite(ta) && ta === Date.parse(b);
+}
+
 interface Confirmacion {
   valores: FormValues;
   payload: ReporteInput;
@@ -151,6 +159,23 @@ function Formulario({
   // Tope del selector de fecha: hoy en Panamá al abrir el formulario.
   const [hoy] = useState(() => hoyPanama());
 
+  // Si la última atención la registró una visita, su fecha no se cambia aquí
+  // (se muestra sin editar): cambia al registrar otra visita.
+  const { visitas } = useVisitas(esNuevo ? null : inicial?.id);
+  const atencionDeVisita =
+    inicial?.estado === "ATENDIDO" && mismoInstante(visitas[0]?.visitado_at, inicial.attended_at);
+
+  // La fecha de atención sigue a la fecha del reporte mientras coincidan (la
+  // atención se registró con el reporte): así la cuenta de días se ajusta sola.
+  const [fechaReporteAnterior, setFechaReporteAnterior] = useState(defaults.fecha_reporte);
+  const seguirFechaReporte = (nueva: string) => {
+    const anterior = fechaReporteAnterior;
+    setFechaReporteAnterior(nueva);
+    if (esNuevo || atencionDeVisita || !anterior || getValues("fecha_atencion") !== anterior) return;
+    setValue("fecha_atencion", nueva);
+    clearErrors("fecha_atencion");
+  };
+
   // El perfil puede llegar después de abrir el formulario: rellena el brigadista si no se tocó.
   const nombrePerfil = profile?.nombre_completo ?? null;
   useEffect(() => {
@@ -173,11 +198,24 @@ function Formulario({
     };
   }, [esNuevo, getFieldState, resetField]);
 
-  const [estado, chkEntrega, chkNecesidad, casosMedicos, adultos, mayores, menores] = useWatch({
-    control,
-    name: ["estado", "chkEntrega", "chkNecesidad", "casos_medicos", "adultos", "adultos_mayores", "menores"],
-  });
+  const [estado, chkEntrega, chkNecesidad, casosMedicos, adultos, mayores, menores, fechaReporte, fechaAtencion] =
+    useWatch({
+      control,
+      name: [
+        "estado",
+        "chkEntrega",
+        "chkNecesidad",
+        "casos_medicos",
+        "adultos",
+        "adultos_mayores",
+        "menores",
+        "fecha_reporte",
+        "fecha_atencion",
+      ],
+    });
   const visibles = seccionesVisibles(estado, chkEntrega, chkNecesidad);
+  // En un reporte nuevo la atención es la fecha del reporte: no hay campo aparte.
+  const conFechaAtencion = !esNuevo && estado === "ATENDIDO";
   const total = totalPersonas({ adultos, adultos_mayores: mayores, menores });
 
   const [foto, setFoto] = useState<Blob | null>(null);
@@ -231,7 +269,7 @@ function Formulario({
     setErrorUbicacion(null);
     const clubId = valores.club_id ?? (esNuevo ? (profile?.club_id ?? club?.id ?? null) : null);
     const payload = construirPayload({ ...valores, club_id: clubId }, ubic);
-    const errores = validarPayload(payload);
+    const errores = validarPayload(payload, conFechaAtencion ? valores.fecha_atencion : undefined);
     const campos = Object.keys(errores);
     if (campos.length > 0) {
       const desconocidos: string[] = [];
@@ -426,7 +464,12 @@ function Formulario({
                 required
                 className={inputFechaClass}
                 {...aria("fecha_reporte")}
-                {...register("fecha_reporte", { onChange: () => clearErrors("fecha_reporte") })}
+                {...register("fecha_reporte", {
+                  onChange: (e: { target: { value: string } }) => {
+                    clearErrors("fecha_reporte");
+                    seguirFechaReporte(e.target.value);
+                  },
+                })}
               />
               <ErrorCampo id="error-fecha_reporte" mensaje={errorDe("fecha_reporte")} />
             </div>
@@ -443,6 +486,31 @@ function Formulario({
                 />
               )}
             />
+            {conFechaAtencion &&
+              (atencionDeVisita && fechaAtencion ? (
+                <div data-testid="fecha-atencion-visita">
+                  <p className="font-semibold text-ink">Fecha de atención</p>
+                  <p className="text-ink-soft">
+                    Última atención: visita del {formatearFechaLarga(fechaAtencion)}. Cambia al registrar otra visita.
+                  </p>
+                  <ErrorCampo id="error-fecha_atencion" mensaje={errorDe("fecha_atencion")} />
+                </div>
+              ) : (
+                <div>
+                  <Etiqueta htmlFor="campo-fecha-atencion">Fecha de atención</Etiqueta>
+                  <input
+                    id="campo-fecha-atencion"
+                    type="date"
+                    min={fechaReporte || undefined}
+                    max={hoy}
+                    required
+                    className={inputFechaClass}
+                    {...aria("fecha_atencion")}
+                    {...register("fecha_atencion", { onChange: () => clearErrors("fecha_atencion") })}
+                  />
+                  <ErrorCampo id="error-fecha_atencion" mensaje={errorDe("fecha_atencion")} />
+                </div>
+              ))}
             <Controller
               control={control}
               name="prioridad"

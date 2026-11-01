@@ -71,7 +71,13 @@ function montar(props: Partial<Parameters<typeof VisitaForm>[0]> = {}) {
 
 const siEn = (label: string) => within(screen.getByRole("radiogroup", { name: label })).getByRole("radio", { name: "Sí" });
 
+/** Elige la fecha de la visita: empieza vacía. */
+function elegirFecha(fecha: string = hoyPanama()) {
+  fireEvent.change(screen.getByLabelText("Fecha de la visita"), { target: { value: fecha } });
+}
+
 async function confirmar(user: ReturnType<typeof userEvent.setup>) {
+  if (!(screen.getByLabelText("Fecha de la visita") as HTMLInputElement).value) elegirFecha();
   await user.click(screen.getByRole("button", { name: "Guardar visita" }));
   return screen.findByRole("alertdialog");
 }
@@ -88,7 +94,7 @@ beforeEach(async () => {
 });
 
 describe("VisitaForm: valores por defecto y contexto", () => {
-  it("muestra el contexto del reporte, la fecha de hoy, el brigadista del perfil y todo en No", () => {
+  it("muestra el contexto del reporte, la fecha vacía, el brigadista del perfil y todo en No", () => {
     montar();
     expect(mocks.useReporte).toHaveBeenCalledWith(ID);
     expect(screen.getByRole("heading", { name: "Registrar visita" })).toBeInTheDocument();
@@ -99,7 +105,8 @@ describe("VisitaForm: valores por defecto y contexto", () => {
 
     const fecha = screen.getByLabelText("Fecha de la visita");
     expect(fecha).toHaveAttribute("type", "date");
-    expect(fecha).toHaveValue(hoyPanama());
+    expect(fecha).toHaveValue("");
+    expect(fecha).toBeRequired();
     expect(fecha).toHaveAttribute("max", hoyPanama());
     expect(screen.getByLabelText("Brigadista responsable")).toHaveValue("Ana Brigadista");
     for (const label of ["¿Se entregó Agua?", "¿Se entregó Lona?", "¿Se entregaron Colchonetas?"]) {
@@ -146,6 +153,7 @@ describe("VisitaForm: valores por defecto y contexto", () => {
 describe("VisitaForm: validación", () => {
   it("una visita vacía no se guarda: mensaje sobre las entregas y foco en él", async () => {
     const { user } = montar();
+    elegirFecha();
     await user.click(screen.getByRole("button", { name: "Guardar visita" }));
     const alerta = screen.getByRole("alert");
     expect(alerta).toHaveTextContent(MSG_VISITA_VACIA);
@@ -185,13 +193,15 @@ describe("VisitaForm: validación", () => {
     expect(mocks.saveVisita).not.toHaveBeenCalled();
   });
 
-  it("una fecha vacía muestra un error en español", async () => {
+  it("sin fecha no se guarda: pide elegirla y le da el foco", async () => {
     const { user } = montar();
     await user.click(siEn("¿Se entregó Agua?"));
     const fecha = screen.getByLabelText("Fecha de la visita");
-    fireEvent.change(fecha, { target: { value: "" } });
     await user.click(screen.getByRole("button", { name: "Guardar visita" }));
-    expect(fecha).toHaveAccessibleDescription("Escribe una fecha válida.");
+    expect(fecha).toHaveAttribute("aria-invalid", "true");
+    expect(fecha).toHaveAccessibleDescription("Elige la fecha de la visita.");
+    await waitFor(() => expect(fecha).toHaveFocus());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mocks.saveVisita).not.toHaveBeenCalled();
   });
 });

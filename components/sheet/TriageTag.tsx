@@ -74,16 +74,10 @@ export interface TriageTagProps {
 const SELLO: Record<Vigencia, string> = {
   pendiente: "PENDIENTE",
   reciente: "ATENDIDO",
-  "por-vencer": "ATENDIDO",
   vencido: "REVISITAR",
 };
 const SELLOS = ["PENDIENTE", "ATENDIDO", "REVISITAR"] as const;
 const PRIORIDAD_CORTA = { ALTA: "Alta", MEDIA: "Media", BAJA: "Baja" } as const;
-
-/** "hace 1 día", "hace 5 días" (debajo del sello). */
-function haceDias(dias: number): string {
-  return dias === 1 ? "hace 1 día" : `hace ${dias} días`;
-}
 
 /**
  * Ficha de triaje de un reporte: el elemento memorable de la app.
@@ -196,30 +190,18 @@ export function TriageTag({
               <span className="sr-only">Prioridad </span>
               {PRIORIDAD_CORTA[r.prioridad]}
             </p>
-            <div className="flex flex-col items-center gap-2">
-              <p className={cn("ficha-stamp", "font-stamp text-2xl")} data-testid="sello">
-                <span className="sr-only">Estado: </span>
-                {SELLOS.map((texto) => (
-                  <span
-                    key={texto}
-                    data-visible={SELLO[visible] === texto}
-                    aria-hidden={SELLO[visible] !== texto}
-                  >
-                    {texto}
-                  </span>
-                ))}
-              </p>
-              {/* Por vencer: debajo del sello, cuánto hace de la atención. */}
-              {visible === "por-vencer" && dias !== null && (
-                <p
-                  className="ficha-stamp-note text-center text-sm leading-tight font-semibold"
-                  aria-hidden="true"
-                  data-testid="sello-nota"
+            <p className={cn("ficha-stamp", "font-stamp text-2xl")} data-testid="sello">
+              <span className="sr-only">Estado: </span>
+              {SELLOS.map((texto) => (
+                <span
+                  key={texto}
+                  data-visible={SELLO[visible] === texto}
+                  aria-hidden={SELLO[visible] !== texto}
                 >
-                  {haceDias(dias)}
-                </p>
-              )}
-            </div>
+                  {texto}
+                </span>
+              ))}
+            </p>
           </div>
           <div className="ficha-perforation" aria-hidden="true" />
 
@@ -431,7 +413,6 @@ export interface AccionesFichaProps {
  * Acciones de la ficha según la vigencia:
  * - pendiente: "Registrar entrega" (principal) y "Editar".
  * - vencido: "Registrar nueva visita" es la principal.
- * - por vencer: "Registrar nueva visita" secundaria destacada (borde naranja).
  * - reciente: "Registrar nueva visita" secundaria.
  */
 export function AccionesFicha({
@@ -458,22 +439,15 @@ export function AccionesFicha({
       </div>
     );
   }
-  const porVencer = vigencia === "por-vencer";
   return (
     <div className={cn("flex gap-2", className)}>
       <Button
         variant={vigencia === "vencido" ? "primary" : "secondary"}
         onClick={onRegistrarVisita}
         data-enfasis={vigencia}
-        className={cn(
-          "min-h-14 flex-1 px-4",
-          porVencer && "border-2 border-aging hover:border-aging",
-        )}
+        className="min-h-14 flex-1 px-4"
       >
-        <HousePlus
-          aria-hidden="true"
-          className={cn("size-5 shrink-0", porVencer && "text-aging")}
-        />
+        <HousePlus aria-hidden="true" className="size-5 shrink-0" />
         Registrar nueva visita
       </Button>
       {editar}

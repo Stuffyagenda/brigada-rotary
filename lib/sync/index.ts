@@ -137,7 +137,8 @@ async function guardarReporteLocal(input: ReporteInput, foto: Blob | null | unde
   const parsed = reporteSchema.parse({
     ...input,
     id,
-    attended_at: calcularAttendedAt(input.estado, input.attended_at, ahora),
+    // Red de seguridad: un ATENDIDO sin `attended_at` toma la fecha del reporte.
+    attended_at: calcularAttendedAt(input.estado, input.attended_at, input.attended_at ? null : input.fecha_reporte, ahora),
   });
 
   await db.transaction("rw", db.reportes, db.outbox, async () => {

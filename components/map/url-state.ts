@@ -43,10 +43,10 @@ export const PARAM = {
   visita: "visita",
 } as const;
 
-/** Alias del antiguo `estado=`: PENDIENTE → pendiente; ATENDIDO → las tres vigencias de atendido. */
+/** Alias del antiguo `estado=`: PENDIENTE → pendiente; ATENDIDO → las dos vigencias de atendido. */
 const ALIAS_ESTADO: Record<string, readonly Vigencia[]> = {
   PENDIENTE: ["pendiente"],
-  ATENDIDO: ["reciente", "por-vencer", "vencido"],
+  ATENDIDO: ["reciente", "vencido"],
 };
 
 const NECESIDADES_VALIDAS: readonly string[] = [...INSUMO_CLAVES, "otros"];
@@ -66,7 +66,7 @@ function lista<T extends string>(params: URLSearchParams, nombre: string, valido
 
 /**
  * Vigencias de la URL. Si no hay `vigencia=`, se traduce el antiguo `estado=`
- * (PENDIENTE → pendiente; ATENDIDO → reciente, por-vencer y vencido).
+ * (PENDIENTE → pendiente; ATENDIDO → reciente y vencido).
  */
 function vigenciasDe(params: URLSearchParams): Vigencia[] {
   if (params.get(PARAM.vigencia)) return lista<Vigencia>(params, PARAM.vigencia, VIGENCIAS);
@@ -146,7 +146,7 @@ export function contarPorVigencia(
   reportes: readonly Pick<ReporteLocal, "estado" | "attended_at">[],
   ahora: Date = new Date(),
 ): Record<Vigencia, number> {
-  const out: Record<Vigencia, number> = { pendiente: 0, reciente: 0, "por-vencer": 0, vencido: 0 };
+  const out: Record<Vigencia, number> = { pendiente: 0, reciente: 0, vencido: 0 };
   for (const r of reportes) out[vigenciaDe(r, ahora)] += 1;
   return out;
 }

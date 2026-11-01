@@ -18,7 +18,7 @@ import { vigencia as vigenciaDe } from "@/lib/vigencia";
 export interface FiltrosReporte {
   estado?: Estado[];
   /**
-   * Vigencia de la atención (`pendiente`, `reciente`, `por-vencer`, `vencido`;
+   * Vigencia de la atención (`pendiente`, `reciente`, `vencido`;
    * ver lib/vigencia.ts), calculada respecto a `ahora`. En el mapa reemplaza al
    * filtro `estado` (parámetro `vigencia` de la URL).
    */

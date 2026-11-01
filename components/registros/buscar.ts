@@ -1,7 +1,7 @@
 /**
  * Búsqueda de /registros: contacto, teléfono, brigadista, estado y Plus Code
  * (FiltrosReporte.texto; el Plus Code calculado si no hay guardado), el id del
- * reporte, la vigencia ("Pendiente", "Atendido hace 5 días", "4+ días",
+ * reporte, la vigencia ("Pendiente", "Atendido hace 5 días", "15+ días",
  * "Necesita nueva visita", "revisitar") y la fecha del reporte en texto
  * ("18 de octubre de 2026"). Solo local: nunca sale del celular.
  */

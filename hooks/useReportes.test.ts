@@ -44,18 +44,19 @@ describe("filtrarReportes", () => {
 
   it("filtra por vigencia respecto a `ahora` (y sigue funcionando por estado)", () => {
     const ahora = new Date("2026-10-19T15:00:00.000Z");
-    const reciente = reporte({ estado: "ATENDIDO", attended_at: "2026-10-17T15:00:00.000Z" });
-    const porVencer = reporte({ estado: "ATENDIDO", attended_at: "2026-10-14T15:00:00.000Z" });
-    const vencido = reporte({ estado: "ATENDIDO", attended_at: "2026-10-12T15:00:00.000Z" });
-    const lista = [A, reciente, porVencer, vencido];
+    const reciente = reporte({ estado: "ATENDIDO", attended_at: "2026-10-17T15:00:00.000Z" }); // 2 días
+    const semana = reporte({ estado: "ATENDIDO", attended_at: "2026-10-12T15:00:00.000Z" }); // 7 días
+    const vencido = reporte({ estado: "ATENDIDO", attended_at: "2026-10-04T15:00:00.000Z" }); // 15 días
+    const lista = [A, reciente, semana, vencido];
     expect(filtrarReportes(lista, { vigencia: ["pendiente"] }, ahora)).toEqual([A]);
-    expect(filtrarReportes(lista, { vigencia: ["reciente"] }, ahora)).toEqual([reciente]);
-    expect(filtrarReportes(lista, { vigencia: ["por-vencer", "vencido"] }, ahora)).toEqual([porVencer, vencido]);
+    expect(filtrarReportes(lista, { vigencia: ["reciente"] }, ahora)).toEqual([reciente, semana]);
+    expect(filtrarReportes(lista, { vigencia: ["vencido"] }, ahora)).toEqual([vencido]);
     expect(filtrarReportes(lista, { vigencia: [] }, ahora)).toEqual(lista);
-    expect(filtrarReportes(lista, { estado: ["ATENDIDO"] }, ahora)).toEqual([reciente, porVencer, vencido]);
-    // Al pasar el tiempo, el reciente pasa a por vencer.
-    expect(filtrarReportes(lista, { vigencia: ["por-vencer"] }, new Date("2026-10-21T15:00:00.000Z"))).toEqual([
-      reciente,
+    expect(filtrarReportes(lista, { estado: ["ATENDIDO"] }, ahora)).toEqual([reciente, semana, vencido]);
+    // Al pasar el tiempo, el de hace una semana llega a los 15 días y vence.
+    expect(filtrarReportes(lista, { vigencia: ["vencido"] }, new Date("2026-10-27T15:00:00.000Z"))).toEqual([
+      semana,
+      vencido,
     ]);
   });
 

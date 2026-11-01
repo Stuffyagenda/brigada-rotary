@@ -90,10 +90,9 @@ describe("vigencia", () => {
     expect(vigencia({ estado: "PENDIENTE", attended_at: null }, AHORA)).toBe("pendiente");
   });
 
-  it("umbrales: 0–3 reciente, 4–6 por vencer, ≥ 7 vencido", () => {
-    expect([0, 1, 2, 3].map((d) => vigencia(atendidoHace(d), AHORA))).toEqual(Array(4).fill("reciente"));
-    expect([4, 5, 6].map((d) => vigencia(atendidoHace(d), AHORA))).toEqual(Array(3).fill("por-vencer"));
-    expect([7, 8, 30].map((d) => vigencia(atendidoHace(d), AHORA))).toEqual(Array(3).fill("vencido"));
+  it("umbrales: 0–14 reciente, ≥ 15 vencido (sin estados intermedios)", () => {
+    expect([0, 3, 4, 7, 14].map((d) => vigencia(atendidoHace(d), AHORA))).toEqual(Array(5).fill("reciente"));
+    expect([15, 16, 30].map((d) => vigencia(atendidoHace(d), AHORA))).toEqual(Array(3).fill("vencido"));
   });
 
   it("ATENDIDO sin attended_at cuenta como vencido", () => {
@@ -101,9 +100,8 @@ describe("vigencia", () => {
   });
 
   it("etiquetas y orden", () => {
-    expect(VIGENCIAS).toEqual(["pendiente", "reciente", "por-vencer", "vencido"]);
-    expect(VIGENCIA_LABEL["por-vencer"]).toBe("4+ días");
-    expect(VIGENCIA_LABEL.vencido).toBe("7+ días");
+    expect(VIGENCIAS).toEqual(["pendiente", "reciente", "vencido"]);
+    expect(VIGENCIA_LABEL.vencido).toBe("15+ días");
     expect(textoAtendidoHace(0)).toBe("Atendido hoy");
     expect(textoAtendidoHace(1)).toBe("Atendido ayer");
     expect(textoAtendidoHace(8)).toBe("Atendido hace 8 días");

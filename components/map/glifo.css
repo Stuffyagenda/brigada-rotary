@@ -3,8 +3,7 @@
  * registros. Forma + color, nunca solo color:
  * - pendiente: círculo relleno rojo
  * - reciente: anillo verde
- * - por-vencer: anillo naranja grueso con punto central
- * - vencido: rombo negro
+ * - vencido: rombo verde oscuro
  */
 
 .glifo {
@@ -33,23 +32,6 @@
 .glifo[data-vigencia="reciente"] {
   border: calc(var(--glifo) * 0.25) solid var(--color-done);
   background-color: var(--color-white);
-}
-
-.glifo[data-vigencia="por-vencer"] {
-  border: calc(var(--glifo) * 0.22) solid var(--color-aging);
-  background-color: var(--color-white);
-}
-
-/* Punto central del anillo "por vencer". */
-.glifo[data-vigencia="por-vencer"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: calc(var(--glifo) * 0.3);
-  height: calc(var(--glifo) * 0.3);
-  border-radius: 9999px;
-  background-color: var(--color-aging);
 }
 
 /*

@@ -34,22 +34,26 @@ describe("filtros en la URL", () => {
 
   it("acepta el antiguo estado= como alias de vigencia", () => {
     expect(parseFiltros(new URLSearchParams("estado=PENDIENTE")).vigencia).toEqual(["pendiente"]);
-    expect(parseFiltros(new URLSearchParams("estado=ATENDIDO")).vigencia).toEqual(["reciente", "por-vencer", "vencido"]);
+    expect(parseFiltros(new URLSearchParams("estado=ATENDIDO")).vigencia).toEqual(["reciente", "vencido"]);
     expect(parseFiltros(new URLSearchParams("estado=ATENDIDO,PENDIENTE,XX")).vigencia).toEqual([
       "pendiente",
       "reciente",
-      "por-vencer",
       "vencido",
     ]);
     // Si están los dos, manda vigencia.
     expect(parseFiltros(new URLSearchParams("estado=ATENDIDO&vigencia=pendiente")).vigencia).toEqual(["pendiente"]);
   });
 
+  it("ignora el antiguo `por-vencer` de enlaces viejos", () => {
+    expect(parseFiltros(new URLSearchParams("vigencia=por-vencer")).vigencia).toEqual([]);
+    expect(parseFiltros(new URLSearchParams("vigencia=por-vencer,vencido")).vigencia).toEqual(["vencido"]);
+  });
+
   it("al escribir, traduce el alias a vigencia= y quita estado=", () => {
     const params = new URLSearchParams("reporte=abc&estado=ATENDIDO");
     const p = writeFiltros(params, parseFiltros(params));
     expect(p.has("estado")).toBe(false);
-    expect(p.get("vigencia")).toBe("reciente,por-vencer,vencido");
+    expect(p.get("vigencia")).toBe("reciente,vencido");
     expect(p.get("reporte")).toBe("abc");
   });
 
@@ -107,29 +111,27 @@ describe("aplicarFiltros", () => {
 });
 
 describe("contarPorVigencia", () => {
-  it("cuenta pendientes, atendidos 0 a 3 días, 4 a 6 y 7 o más", () => {
+  it("cuenta pendientes, atendidos 0 a 14 días y 15 o más", () => {
     const reportes = [
       reporteFicticio(),
       reporteFicticio(),
       reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-19T14:00:00Z" }), // hoy
-      reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-16T15:00:00Z" }), // 3 días
-      reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-15T15:00:00Z" }), // 4 días
-      reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-13T15:00:00Z" }), // 6 días
       reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-12T15:00:00Z" }), // 7 días
+      reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-05T15:00:00Z" }), // 14 días
+      reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-04T15:00:00Z" }), // 15 días
       reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-09-01T15:00:00Z" }),
     ];
     expect(contarPorVigencia(reportes, AHORA)).toEqual({
       pendiente: 2,
-      reciente: 2,
-      "por-vencer": 2,
+      reciente: 3,
       vencido: 2,
     });
   });
 
   it("los días se cuentan en hora de Panamá", () => {
-    // 2026-10-16 03:00 UTC es el 15 de octubre a las 22:00 en Panamá: 4 días antes del 19.
-    const r = reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-16T03:00:00Z" });
-    expect(contarPorVigencia([r], AHORA)["por-vencer"]).toBe(1);
+    // 2026-10-05 03:00 UTC es el 4 de octubre a las 22:00 en Panamá: 15 días antes del 19.
+    const r = reporteFicticio({ estado: "ATENDIDO", attended_at: "2026-10-05T03:00:00Z" });
+    expect(contarPorVigencia([r], AHORA).vencido).toBe(1);
   });
 });
 

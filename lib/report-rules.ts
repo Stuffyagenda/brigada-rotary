@@ -7,6 +7,7 @@ import {
   type Estado,
   type ReporteInput,
 } from "@/lib/types";
+import { esFechaValida, fechaPanama, instanteEnFechaPanama } from "@/lib/vigencia";
 
 /** Casillas del formulario que no se guardan como columna. */
 export interface CasillasFormulario {
@@ -60,16 +61,26 @@ export function seccionesVisibles(
 }
 
 /**
- * Fecha de atención al guardar: se fija al pasar a ATENDIDO (si no tenía) y se
- * vacía en PENDIENTE.
+ * Instante de atención al guardar (`attended_at`), a partir de la fecha que
+ * eligió el brigadista y no de la hora en que se guarda:
+ * - PENDIENTE: `null`.
+ * - Con `fechaAtencion` (`YYYY-MM-DD`, Panamá): si coincide con el día de
+ *   `attendedAtPrevio`, se conserva ese instante; si no, esa fecha con la hora
+ *   actual de Panamá (`instanteEnFechaPanama`).
+ * - Sin `fechaAtencion` (o no válida): se conserva `attendedAtPrevio`.
  */
 export function calcularAttendedAt(
   estado: Estado,
   attendedAtPrevio: string | null | undefined,
+  fechaAtencion?: string | null,
   ahora: Date = new Date(),
 ): string | null {
   if (estado === "PENDIENTE") return null;
-  return attendedAtPrevio ? attendedAtPrevio : ahora.toISOString();
+  if (!fechaAtencion || !esFechaValida(fechaAtencion)) return attendedAtPrevio ?? null;
+  if (attendedAtPrevio && Number.isFinite(Date.parse(attendedAtPrevio)) && fechaPanama(attendedAtPrevio) === fechaAtencion) {
+    return attendedAtPrevio;
+  }
+  return instanteEnFechaPanama(fechaAtencion, ahora);
 }
 
 type ConInsumos = Pick<
@@ -101,7 +112,7 @@ function textoONull(v: string | null | undefined): string | null {
 
 /**
  * Aplica las reglas de guardado al reporte del formulario:
- * - `attended_at` según el estado (ver `calcularAttendedAt`);
+ * - `attended_at` según el estado y `fechaAtencion` (ver `calcularAttendedAt`);
  * - necesidades en NO / vacías si no están activas;
  * - entregas y observaciones vacías si no están activas;
  * - condiciones médicas vacías si `casos_medicos` < 1;
@@ -111,12 +122,13 @@ export function aplicarReglasGuardado(
   input: ReporteInput,
   casillas: CasillasFormulario,
   ahora: Date = new Date(),
+  fechaAtencion?: string | null,
 ): ReporteInput {
   const nec = necesidadesActivas(input.estado, casillas.chkNecesidad);
   const ent = entregasActivas(input.estado, casillas.chkEntrega);
   const out: ReporteInput = {
     ...input,
-    attended_at: calcularAttendedAt(input.estado, input.attended_at, ahora),
+    attended_at: calcularAttendedAt(input.estado, input.attended_at, fechaAtencion, ahora),
     brigadista_texto: textoONull(input.brigadista_texto),
     contacto_nombre: textoONull(input.contacto_nombre),
     contacto_telefono: textoONull(input.contacto_telefono),
