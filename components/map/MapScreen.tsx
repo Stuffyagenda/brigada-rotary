@@ -333,10 +333,10 @@ export function MapScreen() {
       ? vista.id === "nuevo"
         ? "Registrar familia"
         : "Editar reporte"
-      : vista.tipo === "ficha"
-        ? "Ficha de la familia"
-        : filtrosAbiertos
-          ? "Filtros"
+      : filtrosAbiertos
+        ? "Filtros"
+        : vista.tipo === "ficha"
+          ? "Ficha de la familia"
           : "Resumen de la zona";
 
   let contenido: ReactNode;
@@ -376,7 +376,9 @@ export function MapScreen() {
         />
       </div>
     );
-  } else if (filtrosAbiertos && !esEscritorio) {
+  } else if (filtrosAbiertos) {
+    // En el cuerpo del panel (con scroll), también en escritorio: en la cabecera
+    // de la columna no cabía en pantallas bajas o con zoom y no se podía desplazar.
     contenido = (
       <PanelFiltros
         filtros={filtros}
@@ -415,7 +417,7 @@ export function MapScreen() {
       />
     );
   }
-  const vistaKey = `${claveVista(vista)}|${filtrosAbiertos && !esEscritorio}`;
+  const vistaKey = `${claveVista(vista)}|${filtrosAbiertos}`;
 
   const chips = (
     <VigenciaChips
@@ -438,22 +440,7 @@ export function MapScreen() {
           titulo={titulo}
           vistaKey={vistaKey}
           contenidoPropio={conFormulario}
-          filtros={
-            <div className="flex flex-col gap-4">
-              {chips}
-              {filtrosAbiertos && (
-                <div className="border-t border-line pt-4">
-                  <PanelFiltros
-                    filtros={filtros}
-                    clubs={clubes.opciones}
-                    onChange={setFiltros}
-                    onListo={() => setFiltrosAbiertos(false)}
-                    total={visibles.length}
-                  />
-                </div>
-              )}
-            </div>
-          }
+          filtros={chips}
         >
           {contenido}
         </DesktopPanel>
