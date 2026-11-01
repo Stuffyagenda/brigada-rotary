@@ -1,18 +1,23 @@
 "use client";
 
-import { LogOut, UserRoundPen, UserRound, Users } from "lucide-react";
+import { LogOut, Sparkles, UserRoundPen, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DatosPersonalesDialog } from "@/components/auth/DatosPersonalesDialog";
 import { InstallButton, useModoInstalacion } from "@/components/pwa/InstallButton";
+import { NovedadesDialog } from "@/components/pwa/NovedadesDialog";
 import { actualizarMisDatos, nombreCompletoDe } from "@/lib/auth/nombre";
 import { useProfile } from "@/lib/auth/profile";
 import { LOGIN_PATH } from "@/lib/auth/redirect";
 import { cn } from "@/lib/cn";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { novedadesDe } from "@/lib/novedades";
 import { ROL_LABEL, TIPO_CLUB_LABEL } from "@/lib/types";
+import { APP_VERSION } from "@/lib/version";
+
+const NOVEDADES_ACTUALES = novedadesDe(APP_VERSION);
 
 export interface AccountMenuProps {
   /** Lado del botón al que se alinea el panel. Por defecto `end` (derecha). */
@@ -34,8 +39,8 @@ export function initials(nombre: string | null | undefined, email?: string | nul
 
 /**
  * Menú de cuenta: nombre y apellido, club y rol; "Editar mis datos", enlace a
- * Miembros (solo admin), "Instalar app" (o la instrucción de iPhone, si aplica)
- * y Cerrar sesión.
+ * Miembros (solo admin), "Instalar app" (o la instrucción de iPhone, si aplica),
+ * "Novedades" de la versión actual, Cerrar sesión y la versión de la app.
  * Se monta dentro de `ProfileProvider` (layout `(app)`). Sin props obligatorias.
  */
 export function AccountMenu({ align = "end", className }: AccountMenuProps) {
@@ -50,6 +55,7 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [viendoNovedades, setViendoNovedades] = useState(false);
   // Se cierra al navegar (patrón "ajustar estado al cambiar una prop", sin efecto).
   const [lastPath, setLastPath] = useState(pathname);
   if (lastPath !== pathname) {
@@ -170,6 +176,21 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
                 <InstallButton variante="menu" />
               </li>
             )}
+            {NOVEDADES_ACTUALES && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setViendoNovedades(true);
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-base transition-colors duration-140 ease-out hover:bg-ink/5"
+                >
+                  <Sparkles aria-hidden="true" size={20} className="text-ink-soft" />
+                  Novedades
+                </button>
+              </li>
+            )}
             <li>
               <button
                 type="button"
@@ -182,7 +203,20 @@ export function AccountMenu({ align = "end", className }: AccountMenuProps) {
               </button>
             </li>
           </ul>
+          <p className="border-t border-line px-3 pt-2 pb-1 text-sm text-ink-soft">Versión {APP_VERSION}</p>
         </div>
+      )}
+
+      {NOVEDADES_ACTUALES && (
+        <NovedadesDialog
+          open={viendoNovedades}
+          onOpenChange={setViendoNovedades}
+          novedades={NOVEDADES_ACTUALES}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            triggerRef.current?.focus();
+          }}
+        />
       )}
 
       {profile && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { AvisoNovedades } from "@/components/pwa/AvisoNovedades";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { startSyncEngine } from "@/lib/sync";
 
@@ -9,8 +10,9 @@ export interface SyncProviderProps {
 }
 
 /**
- * Arranca el motor de sincronización (y registra el service worker) al montarse
- * en el cliente. Montar una vez en el layout de las rutas con sesión `(app)`.
+ * Arranca el motor de sincronización (y registra el service worker y el aviso
+ * de novedades) al montarse en el cliente. Montar una vez en el layout de las
+ * rutas con sesión `(app)`.
  * Es seguro montarlo más de una vez: el motor es único.
  */
 export function SyncProvider({ children }: SyncProviderProps) {
@@ -18,6 +20,7 @@ export function SyncProvider({ children }: SyncProviderProps) {
   return (
     <>
       <ServiceWorkerRegister />
+      <AvisoNovedades />
       {children}
     </>
   );
