@@ -1,0 +1,91 @@
+# CI/CD: las pruebas corren en cada pull request y en cada push a main.
+# El deploy a producción en Vercel solo ocurre desde main y solo si las pruebas pasan.
+#
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       token de una cuenta con acceso al proyecto (vercel.com/account/tokens)
+#   VERCEL_ORG_ID      "orgId" de .vercel/project.json (tras `vercel link`)
+#   VERCEL_PROJECT_ID  "projectId" de .vercel/project.json
+#
+# Las variables de la app (Supabase) se leen del entorno Production de Vercel con
+# `vercel pull`; no hace falta duplicarlas en GitHub.
+# vercel.json desactiva el deploy automático de Vercel para main (lo hace este
+# workflow); las demás ramas siguen con sus deploys de vista previa.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  # En main no se cancela un deploy a medias; en los PR, el push nuevo reemplaza al anterior.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Pruebas unitarias
+        run: npm test
+
+  deploy:
+    name: Deploy a producción (Vercel)
+    needs: pruebas
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar Vercel CLI
+        run: npm install --global vercel@65
+
+      - name: Traer la configuración de producción
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Publicado en $url" >> "$GITHUB_STEP_SUMMARY"
