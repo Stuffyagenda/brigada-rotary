@@ -40,8 +40,8 @@ export interface VigenciaChipsProps {
 }
 
 /**
- * Chips de vigencia "Pendientes N", "Atendidos N" (0 a 3 días), "4+ días N" y
- * "7+ días N", cada uno con el glifo del pin, y el botón "Filtros".
+ * Chips de vigencia "Pendientes N", "Atendidos N" (0 a 14 días) y
+ * "15+ días N", cada uno con el glifo del pin, y el botón "Filtros".
  * Sobre el mapa (móvil) la fila se desplaza en horizontal: "Filtros" va
  * primero para que esté siempre a mano.
  */
