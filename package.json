@@ -1,8 +1,9 @@
 {
   "name": "brigada-rotary",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
+    "predev": "rm -f public/sw.js",
     "dev": "next dev",
     "build": "next build && serwist build serwist.config.mjs",
     "start": "next start",

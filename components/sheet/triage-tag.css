@@ -1,8 +1,8 @@
 /*
  * Ficha de triaje: franja lateral del color de la vigencia, separada del cuerpo
  * por un borde perforado (muescas arriba y abajo + agujeros), y el sello.
- * Vigencias (lib/vigencia.ts): pendiente rojo, reciente verde, por-vencer
- * naranja (aging), vencido negro (stale). Texto blanco: contraste AA en todas.
+ * Vigencias (lib/vigencia.ts): pendiente rojo, reciente verde, vencido verde
+ * oscuro (stale). Texto blanco: contraste AA en todas.
  */
 
 .ficha-wrap {
@@ -42,10 +42,6 @@
 
 .ficha-tag[data-vigencia="reciente"] .ficha-stripe {
   background-color: var(--color-done);
-}
-
-.ficha-tag[data-vigencia="por-vencer"] .ficha-stripe {
-  background-color: var(--color-aging);
 }
 
 .ficha-tag[data-vigencia="vencido"] .ficha-stripe {
@@ -98,27 +94,10 @@
   filter: blur(2px);
 }
 
-/* "hace N días" bajo el sello (por vencer). */
-.ficha-stamp-note {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  animation: ficha-aparece 220ms var(--ease-out);
-}
-
-@keyframes ficha-aparece {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /*
  * Glifo de la franja: la misma forma que el pin del mapa, en blanco.
- * pendiente = círculo relleno; reciente = anillo; por-vencer = anillo grueso
- * con punto central; vencido = rombo. Los cuatro se superponen y se cruzan
- * con opacidad al cambiar la vigencia.
+ * pendiente = círculo relleno; reciente = anillo; vencido = rombo. Los tres
+ * se superponen y se cruzan con opacidad al cambiar la vigencia.
  */
 .ficha-glyphs {
   display: grid;
@@ -149,21 +128,6 @@
   border: 4px solid var(--color-white);
 }
 
-.ficha-glyph[data-forma="por-vencer"] {
-  border: 4px solid var(--color-white);
-}
-
-.ficha-glyph[data-forma="por-vencer"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 5px;
-  height: 5px;
-  border-radius: 9999px;
-  background-color: var(--color-white);
-}
-
 .ficha-glyph[data-forma="vencido"] {
   width: 14px;
   height: 14px;
@@ -173,7 +137,7 @@
   rotate: 45deg;
 }
 
-/* "Necesita nueva visita": marca lateral negra (stale), además del texto. */
+/* "Necesita nueva visita": marca lateral verde oscuro (stale), además del texto. */
 .ficha-revisitar {
   border-left: 4px solid var(--color-stale);
   padding-left: 8px;

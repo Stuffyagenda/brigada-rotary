@@ -83,9 +83,9 @@ export type ClubPublico = { id: string; nombre: string; tipo: TipoClub };
 
 /**
  * Vigencia de un reporte según los días desde la última atención (`attended_at`):
- * `pendiente` (PENDIENTE), `reciente` (0–3 días), `por-vencer` (4–6), `vencido` (≥ 7).
+ * `pendiente` (PENDIENTE), `reciente` (0–14 días), `vencido` (≥ 15).
  */
-export type Vigencia = "pendiente" | "reciente" | "por-vencer" | "vencido";
+export type Vigencia = "pendiente" | "reciente" | "vencido";
 
 // ---------------------------------------------------------------------------
 // Visitas (entregas posteriores a un reporte ya registrado)

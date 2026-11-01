@@ -5,7 +5,7 @@ import { META_ULTIMO_BRIGADISTA } from "@/lib/brigadista";
 import { db, type ReporteLocal } from "@/lib/db";
 import { encodePlusCode } from "@/lib/pluscode";
 import { reporteVacio } from "@/lib/types";
-import { hoyPanama } from "@/lib/vigencia";
+import { fechaPanama, formatearFechaLarga, hoyPanama, instanteEnFechaPanama } from "@/lib/vigencia";
 
 const mocks = vi.hoisted(() => ({
   saveReport: vi.fn(),
@@ -73,6 +73,11 @@ function montar(props: Partial<Parameters<typeof ReportForm>[0]> = {}) {
   const user = userEvent.setup();
   render(<ReportForm reporteId="nuevo" ubicacion={UBIC} {...handlers} {...props} />);
   return { user, ...handlers };
+}
+
+/** Elige la fecha del reporte: en un reporte nuevo empieza vacía. */
+function elegirFechaReporte(fecha: string = hoyPanama()) {
+  fireEvent.change(screen.getByLabelText("Fecha del reporte"), { target: { value: fecha } });
 }
 
 function seccion(nombre: string) {
@@ -166,6 +171,7 @@ describe("ReportForm: guardar", () => {
 
   it("confirma y llama a saveReport con el payload correcto", async () => {
     const { user, onSaved } = montar();
+    elegirFechaReporte();
     expect(screen.getByLabelText("Brigadista responsable")).toHaveValue("Ana Brigadista");
     await user.type(screen.getByLabelText("Nombre del jefe o jefa de hogar"), "  Familia Pérez ");
     await user.type(screen.getByLabelText("Teléfono o WhatsApp"), "6968-0515");
@@ -216,11 +222,15 @@ describe("ReportForm: guardar", () => {
     expect(onSaved).toHaveBeenCalledWith(ID, "PENDIENTE");
   });
 
-  it("ATENDIDO: fija attended_at y vacía las necesidades si no se marcó la casilla", async () => {
+  it("ATENDIDO: fija attended_at en la fecha del reporte y vacía las necesidades si no se marcó la casilla", async () => {
     mocks.saveReport.mockResolvedValue({ id: ID, status: "synced" });
     const { user, onSaved } = montar();
+    const visita = hoyPanama(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000));
+    elegirFechaReporte(visita);
     await user.click(within(screen.getByRole("radiogroup", { name: "Agua Potable" })).getByRole("radio", { name: "Sí" }));
     await user.click(screen.getByRole("radio", { name: "Atendido" }));
+    // En un reporte nuevo la atención es la fecha del reporte: no hay campo aparte.
+    expect(screen.queryByLabelText("Fecha de atención")).not.toBeInTheDocument();
     await user.click(
       within(screen.getByRole("radiogroup", { name: "¿Se entregó Agua?" })).getByRole("radio", { name: "Sí" }),
     );
@@ -231,7 +241,8 @@ describe("ReportForm: guardar", () => {
     await waitFor(() => expect(mocks.saveReport).toHaveBeenCalledOnce());
     const [payload] = mocks.saveReport.mock.calls[0];
     expect(payload.estado).toBe("ATENDIDO");
-    expect(typeof payload.attended_at).toBe("string");
+    // La cuenta de días empieza el día de la visita, no el día en que se cargó.
+    expect(fechaPanama(payload.attended_at)).toBe(visita);
     expect(payload.nec_agua).toBe(false);
     expect(payload.ent_agua).toBe(true);
     expect(payload.observaciones_atencion).toBe("Se entregó agua");
@@ -242,6 +253,7 @@ describe("ReportForm: guardar", () => {
   it("muestra el aviso de error si saveReport falla y permite reintentar", async () => {
     mocks.saveReport.mockRejectedValueOnce(new Error("QuotaExceededError"));
     const { user, onSaved } = montar();
+    elegirFechaReporte();
     await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(mocks.toast.error).toHaveBeenCalledWith(MENSAJES_GUARDADO.error));
@@ -251,6 +263,7 @@ describe("ReportForm: guardar", () => {
 
   it("valida el teléfono con un mensaje junto al campo y le da el foco", async () => {
     const { user } = montar();
+    elegirFechaReporte();
     const tel = screen.getByLabelText("Teléfono o WhatsApp");
     await user.type(tel, "llamar al vecino");
     await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
@@ -356,6 +369,7 @@ describe("ReportForm: foto guardada", () => {
 
 describe("ReportForm: brigadista recordado", () => {
   async function guardar(user: ReturnType<typeof userEvent.setup>) {
+    if (!(screen.getByLabelText("Fecha del reporte") as HTMLInputElement).value) elegirFechaReporte();
     await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(mocks.saveReport).toHaveBeenCalled());
@@ -435,12 +449,24 @@ describe("ReportForm: fecha del reporte", () => {
   const DIA = 24 * 60 * 60 * 1000;
   const fechaRelativa = (dias: number) => hoyPanama(new Date(Date.now() + dias * DIA));
 
-  it("al crear, por defecto es hoy (Panamá) y no deja elegir días futuros", () => {
+  it("al crear empieza vacía (hay que elegirla) y no deja elegir días futuros", () => {
     montar();
     const fecha = screen.getByLabelText("Fecha del reporte");
     expect(fecha).toHaveAttribute("type", "date");
-    expect(fecha).toHaveValue(hoyPanama());
+    expect(fecha).toHaveValue("");
+    expect(fecha).toBeRequired();
     expect(fecha).toHaveAttribute("max", hoyPanama());
+  });
+
+  it("sin fecha no se guarda: pide elegirla y le da el foco", async () => {
+    const { user } = montar();
+    const fecha = screen.getByLabelText("Fecha del reporte");
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    expect(fecha).toHaveAttribute("aria-invalid", "true");
+    expect(fecha).toHaveAccessibleDescription("Elige la fecha del reporte.");
+    await waitFor(() => expect(fecha).toHaveFocus());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(mocks.saveReport).not.toHaveBeenCalled();
   });
 
   it("al editar muestra la fecha guardada y la envía en el payload", async () => {
@@ -474,12 +500,13 @@ describe("ReportForm: fecha del reporte", () => {
     expect(mocks.saveReport.mock.calls[0][0].fecha_reporte).toBe(fechaRelativa(-1));
   });
 
-  it("una fecha vacía o inválida muestra un error en español", async () => {
-    const { user } = montar();
+  it("al editar, borrar la fecha muestra un error en español", async () => {
+    mocks.useReporte.mockReturnValue({ reporte: reporteGuardado({ fecha_reporte: fechaRelativa(-2) }), loading: false });
+    const { user } = montar({ reporteId: ID });
     const fecha = screen.getByLabelText("Fecha del reporte");
     fireEvent.change(fecha, { target: { value: "" } });
     await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
-    expect(fecha).toHaveAccessibleDescription("Escribe una fecha válida.");
+    expect(fecha).toHaveAccessibleDescription("Elige la fecha del reporte.");
     expect(mocks.saveReport).not.toHaveBeenCalled();
   });
 
@@ -499,5 +526,125 @@ describe("ReportForm: fecha del reporte", () => {
     await user.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(await screen.findByRole("alertdialog", { name: "¿Descartar los cambios?" })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("ReportForm: fecha de atención", () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  const fechaRelativa = (dias: number) => hoyPanama(new Date(Date.now() + dias * DIA));
+
+  async function guardar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mocks.saveReport).toHaveBeenCalledOnce());
+    return mocks.saveReport.mock.calls[0][0];
+  }
+
+  beforeEach(async () => {
+    await db.visitas.clear();
+  });
+
+  it("al marcar ATENDIDO un reporte pendiente pide la fecha de atención (vacía y obligatoria)", async () => {
+    const reporte = fechaRelativa(-10);
+    mocks.useReporte.mockReturnValue({ reporte: reporteGuardado({ fecha_reporte: reporte }), loading: false });
+    const { user } = montar({ reporteId: ID });
+    expect(screen.queryByLabelText("Fecha de atención")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "Atendido" }));
+    const atencion = screen.getByLabelText("Fecha de atención");
+    expect(atencion).toHaveValue("");
+    expect(atencion).toHaveAttribute("min", reporte);
+    expect(atencion).toHaveAttribute("max", hoyPanama());
+
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    expect(atencion).toHaveAccessibleDescription("Elige la fecha de atención.");
+    await waitFor(() => expect(atencion).toHaveFocus());
+    expect(mocks.saveReport).not.toHaveBeenCalled();
+
+    const dia = fechaRelativa(-4);
+    fireEvent.change(atencion, { target: { value: dia } });
+    const payload = await guardar(user);
+    expect(payload.estado).toBe("ATENDIDO");
+    expect(fechaPanama(payload.attended_at)).toBe(dia);
+    expect(payload.fecha_reporte).toBe(reporte);
+  });
+
+  it("no acepta una fecha de atención anterior a la fecha del reporte", async () => {
+    mocks.useReporte.mockReturnValue({ reporte: reporteGuardado({ fecha_reporte: fechaRelativa(-5) }), loading: false });
+    const { user } = montar({ reporteId: ID });
+    await user.click(screen.getByRole("radio", { name: "Atendido" }));
+    const atencion = screen.getByLabelText("Fecha de atención");
+    fireEvent.change(atencion, { target: { value: fechaRelativa(-8) } });
+    await user.click(screen.getByRole("button", { name: "Guardar reporte" }));
+    expect(atencion).toHaveAccessibleDescription("La fecha de atención no puede ser anterior a la fecha del reporte.");
+    expect(mocks.saveReport).not.toHaveBeenCalled();
+  });
+
+  it("al cambiar la fecha del reporte, la atención registrada con él la sigue y la cuenta se ajusta", async () => {
+    const original = fechaRelativa(-20);
+    const attended = instanteEnFechaPanama(original);
+    mocks.useReporte.mockReturnValue({
+      reporte: reporteGuardado({ estado: "ATENDIDO", fecha_reporte: original, attended_at: attended }),
+      loading: false,
+    });
+    const { user } = montar({ reporteId: ID });
+    const atencion = screen.getByLabelText("Fecha de atención");
+    expect(atencion).toHaveValue(original);
+
+    const corregida = fechaRelativa(-3);
+    fireEvent.change(screen.getByLabelText("Fecha del reporte"), { target: { value: corregida } });
+    expect(atencion).toHaveValue(corregida);
+    const payload = await guardar(user);
+    expect(payload.fecha_reporte).toBe(corregida);
+    expect(fechaPanama(payload.attended_at)).toBe(corregida);
+  });
+
+  it("si la fecha de atención es otra, cambiar la fecha del reporte no la toca", async () => {
+    const reporte = fechaRelativa(-20);
+    const atendido = fechaRelativa(-6);
+    const attended = instanteEnFechaPanama(atendido);
+    mocks.useReporte.mockReturnValue({
+      reporte: reporteGuardado({ estado: "ATENDIDO", fecha_reporte: reporte, attended_at: attended }),
+      loading: false,
+    });
+    const { user } = montar({ reporteId: ID });
+    fireEvent.change(screen.getByLabelText("Fecha del reporte"), { target: { value: fechaRelativa(-18) } });
+    expect(screen.getByLabelText("Fecha de atención")).toHaveValue(atendido);
+    const payload = await guardar(user);
+    // Misma fecha de atención: se conserva el instante guardado tal cual.
+    expect(payload.attended_at).toBe(attended);
+  });
+
+  it("si la última atención vino de una visita, se muestra sin editar", async () => {
+    const atendido = fechaRelativa(-2);
+    const attended = instanteEnFechaPanama(atendido);
+    await db.visitas.put({
+      id: "7a1b2c3d-0000-4000-8000-000000000099",
+      reporte_id: ID,
+      fecha: atendido,
+      visitado_at: attended,
+      brigadista_texto: null,
+      ent_agua: true,
+      ent_kit_alimento: false,
+      ent_kit_higiene: false,
+      ent_lona: false,
+      ent_camping: false,
+      ent_toldas: false,
+      ent_colchonetas: false,
+      ent_otros: [],
+      observaciones: null,
+      created_at: attended,
+      created_by: null,
+      _sync: "synced",
+    });
+    mocks.useReporte.mockReturnValue({
+      reporte: reporteGuardado({ estado: "ATENDIDO", fecha_reporte: fechaRelativa(-15), attended_at: attended }),
+      loading: false,
+    });
+    montar({ reporteId: ID });
+    expect(await screen.findByTestId("fecha-atencion-visita")).toHaveTextContent(
+      `Última atención: visita del ${formatearFechaLarga(atendido)}`,
+    );
+    expect(screen.queryByLabelText("Fecha de atención")).not.toBeInTheDocument();
   });
 });

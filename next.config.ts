@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { version } from "./package.json";
 
 /**
  * Configuración de Next.js.
@@ -9,6 +10,8 @@ import type { NextConfig } from "next";
  * con `serwist build` justo después de `next build` (script `build`).
  */
 const nextConfig: NextConfig = {
+  // Versión de la app (lib/version.ts): solo el número, no todo el package.json.
+  env: { NEXT_PUBLIC_APP_VERSION: version },
   // Cache Components / Partial Prefetching desactivados: la app es offline-first
   // (los datos se leen de IndexedDB en el cliente) y la sesión se lee de cookies
   // en el servidor sin necesidad de envolverla en <Suspense>.

@@ -5,7 +5,8 @@
 import type { ReporteLocal } from "@/lib/db";
 import { encodePlusCode, type LatLng } from "@/lib/pluscode";
 import { aplicarReglasGuardado, casillasIniciales, type CasillasFormulario } from "@/lib/report-rules";
-import { reporteSchema, reporteVacio, type ReporteInput } from "@/lib/types";
+import { fechaNoFuturaSchema, reporteSchema, reporteVacio, type ReporteInput } from "@/lib/types";
+import { esFechaValida, fechaPanama } from "@/lib/vigencia";
 import { z } from "zod";
 
 /** Lo que maneja react-hook-form: el reporte sin ubicación más las casillas que no se guardan. */
@@ -15,6 +16,12 @@ export type FormValues = Omit<ReporteInput, "lat" | "lng" | "plus_code"> &
     contacto_nombre: string;
     contacto_telefono: string;
     observaciones_atencion: string;
+    /**
+     * Fecha de la última atención (`YYYY-MM-DD`, Panamá), solo del formulario:
+     * de ella sale `attended_at`. En un reporte nuevo no se usa (la atención
+     * es la fecha del reporte).
+     */
+    fecha_atencion: string;
   };
 
 /** Campos de texto: el formulario usa "" en lugar de null (inputs controlados por el DOM). */
@@ -50,14 +57,27 @@ export interface ValoresInicialesOpciones {
   clubId?: string | null;
 }
 
-/** Valores iniciales: los del reporte a editar o los de un reporte vacío. */
+/** Fecha de Panamá de `attended_at`, o "" si no hay (o no es válido). */
+function fechaDeAtencion(attendedAt: string | null | undefined): string {
+  return attendedAt && Number.isFinite(Date.parse(attendedAt)) ? fechaPanama(attendedAt) : "";
+}
+
+/**
+ * Valores iniciales: los del reporte a editar o los de un reporte vacío.
+ * En un reporte nuevo la fecha empieza vacía: el brigadista debe elegirla.
+ */
 export function valoresIniciales(
   reporte: ReporteLocal | null | undefined,
   opciones: ValoresInicialesOpciones = {},
 ): FormValues {
   const base: ReporteInput = reporte
     ? aInput(reporte)
-    : { ...reporteVacio(0, 0), brigadista_texto: opciones.brigadista ?? null, club_id: opciones.clubId ?? null };
+    : {
+        ...reporteVacio(0, 0),
+        fecha_reporte: "",
+        brigadista_texto: opciones.brigadista ?? null,
+        club_id: opciones.clubId ?? null,
+      };
   const casillas: CasillasFormulario = reporte
     ? casillasIniciales(base)
     : { chkEntrega: false, chkNecesidad: false };
@@ -67,7 +87,21 @@ export function valoresIniciales(
   void plus_code;
   const valores = { ...resto, ...casillas } as FormValues;
   for (const k of TEXTOS) valores[k] = base[k] ?? "";
+  valores.fecha_atencion = base.estado === "ATENDIDO" ? fechaDeAtencion(base.attended_at) : "";
   return valores;
+}
+
+/** Un reporte es nuevo mientras no tiene id (`saveReport` lo genera al guardar). */
+function esNuevo(valores: Pick<FormValues, "id">): boolean {
+  return !valores.id;
+}
+
+/**
+ * Fecha de la que sale `attended_at`: en un reporte nuevo, la fecha del
+ * reporte; en uno existente, la del campo "Fecha de atención".
+ */
+export function fechaAtencionEfectiva(valores: Pick<FormValues, "id" | "fecha_reporte" | "fecha_atencion">): string {
+  return esNuevo(valores) ? valores.fecha_reporte : valores.fecha_atencion;
 }
 
 /**
@@ -76,14 +110,15 @@ export function valoresIniciales(
  * (attended_at, secciones inactivas vacías, condiciones médicas, textos).
  */
 export function construirPayload(valores: FormValues, ubicacion: LatLng, ahora: Date = new Date()): ReporteInput {
-  const { chkEntrega, chkNecesidad, ...resto } = valores;
+  const { chkEntrega, chkNecesidad, fecha_atencion, ...resto } = valores;
+  void fecha_atencion;
   const input: ReporteInput = {
     ...resto,
     lat: ubicacion.lat,
     lng: ubicacion.lng,
     plus_code: encodePlusCode(ubicacion.lat, ubicacion.lng),
   };
-  return aplicarReglasGuardado(input, { chkEntrega, chkNecesidad }, ahora);
+  return aplicarReglasGuardado(input, { chkEntrega, chkNecesidad }, ahora, fechaAtencionEfectiva(valores));
 }
 
 // ---------------------------------------------------------------------------
@@ -111,9 +146,34 @@ const MENSAJE_GENERICO: Record<string, string> = {
   danio_vivienda: "Elige el daño de la vivienda.",
 };
 
-/** Errores por campo (primer mensaje de cada uno). Vacío si el payload es válido. */
-export function validarPayload(payload: ReporteInput): Record<string, string> {
+const fechaAtencionSchema = fechaNoFuturaSchema("La fecha de atención no puede ser futura.");
+
+/**
+ * Error de la "Fecha de atención" (solo reportes existentes en ATENDIDO):
+ * obligatoria, válida, no futura y no anterior a la fecha del reporte.
+ */
+function errorFechaAtencion(fechaAtencion: string, fechaReporte: string): string | null {
+  if (fechaAtencion === "") return "Elige la fecha de atención.";
+  const r = fechaAtencionSchema.safeParse(fechaAtencion);
+  if (!r.success) return r.error.issues[0]?.message ?? "Escribe una fecha válida.";
+  if (esFechaValida(fechaReporte) && fechaAtencion < fechaReporte) {
+    return "La fecha de atención no puede ser anterior a la fecha del reporte.";
+  }
+  return null;
+}
+
+/**
+ * Errores por campo (primer mensaje de cada uno). Vacío si el payload es válido.
+ * @param fechaAtencion valor del campo "Fecha de atención" si está a la vista
+ *   (reporte existente en ATENDIDO); `undefined` si no aplica.
+ */
+export function validarPayload(payload: ReporteInput, fechaAtencion?: string): Record<string, string> {
   const errores: Record<string, string> = {};
+  if (payload.fecha_reporte === "") errores.fecha_reporte = "Elige la fecha del reporte.";
+  if (fechaAtencion !== undefined && payload.estado === "ATENDIDO") {
+    const error = errorFechaAtencion(fechaAtencion, payload.fecha_reporte);
+    if (error) errores.fecha_atencion = error;
+  }
   const add = (issues: z.ZodError["issues"]) => {
     for (const issue of issues) {
       const campo = String(issue.path[0] ?? "formulario");
@@ -126,5 +186,7 @@ export function validarPayload(payload: ReporteInput): Record<string, string> {
   if (!base.success) add(base.error.issues);
   const extras = extrasSchema.safeParse(payload);
   if (!extras.success) add(extras.error.issues);
+  // Sin fecha válida no hay `attended_at`: el error ya está en el campo de la fecha.
+  if (errores.fecha_reporte || errores.fecha_atencion) delete errores.attended_at;
   return errores;
 }

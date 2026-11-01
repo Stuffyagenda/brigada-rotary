@@ -12,14 +12,33 @@ import { reporteVacio } from "@/lib/types";
 const AHORA = new Date("2026-10-19T12:00:00.000Z");
 
 describe("attended_at", () => {
-  it("se fija al pasar a ATENDIDO", () => {
-    expect(calcularAttendedAt("ATENDIDO", null, AHORA)).toBe(AHORA.toISOString());
+  it("sale de la fecha de atención elegida, con la hora actual de Panamá", () => {
+    // AHORA = 07:00 en Panamá; la atención del 10 queda a las 07:00 de ese día.
+    expect(calcularAttendedAt("ATENDIDO", null, "2026-10-10", AHORA)).toBe("2026-10-10T12:00:00.000Z");
   });
-  it("conserva la fecha previa si ya estaba atendido", () => {
-    expect(calcularAttendedAt("ATENDIDO", "2026-10-01T00:00:00.000Z", AHORA)).toBe("2026-10-01T00:00:00.000Z");
+  it("si la fecha de atención es hoy, es exactamente ahora", () => {
+    expect(calcularAttendedAt("ATENDIDO", null, "2026-10-19", AHORA)).toBe(AHORA.toISOString());
+  });
+  it("conserva el instante previo si la fecha de atención no cambió", () => {
+    expect(calcularAttendedAt("ATENDIDO", "2026-10-01T20:15:00.000Z", "2026-10-01", AHORA)).toBe(
+      "2026-10-01T20:15:00.000Z",
+    );
+  });
+  it("cambia si se elige otra fecha de atención", () => {
+    expect(calcularAttendedAt("ATENDIDO", "2026-10-01T20:15:00.000Z", "2026-10-05", AHORA)).toBe(
+      "2026-10-05T12:00:00.000Z",
+    );
+  });
+  it("sin fecha de atención (o no válida) conserva el previo", () => {
+    expect(calcularAttendedAt("ATENDIDO", "2026-10-01T00:00:00.000Z", null, AHORA)).toBe("2026-10-01T00:00:00.000Z");
+    expect(calcularAttendedAt("ATENDIDO", "2026-10-01T00:00:00.000Z", "", AHORA)).toBe("2026-10-01T00:00:00.000Z");
+    expect(calcularAttendedAt("ATENDIDO", null, "no-es-fecha", AHORA)).toBeNull();
+  });
+  it("nunca usa la hora de guardado si no hay fecha", () => {
+    expect(calcularAttendedAt("ATENDIDO", null, undefined, AHORA)).toBeNull();
   });
   it("se vacía en PENDIENTE", () => {
-    expect(calcularAttendedAt("PENDIENTE", "2026-10-01T00:00:00.000Z", AHORA)).toBeNull();
+    expect(calcularAttendedAt("PENDIENTE", "2026-10-01T00:00:00.000Z", "2026-10-01", AHORA)).toBeNull();
   });
 });
 
@@ -91,9 +110,14 @@ describe("aplicarReglasGuardado", () => {
     expect(r.observaciones_atencion).toBe("Se entregó lona");
   });
 
-  it("ATENDIDO sin casilla de necesidad: borra necesidades y fija attended_at", () => {
-    const r = aplicarReglasGuardado({ ...base, estado: "ATENDIDO" }, { chkEntrega: false, chkNecesidad: false }, AHORA);
-    expect(r.attended_at).toBe(AHORA.toISOString());
+  it("ATENDIDO sin casilla de necesidad: borra necesidades y fija attended_at desde la fecha de atención", () => {
+    const r = aplicarReglasGuardado(
+      { ...base, estado: "ATENDIDO" },
+      { chkEntrega: false, chkNecesidad: false },
+      AHORA,
+      "2026-10-12",
+    );
+    expect(r.attended_at).toBe("2026-10-12T12:00:00.000Z");
     expect(r.nec_agua).toBe(false);
     expect(r.nec_otros).toEqual([]);
     expect(r.ent_lona).toBe(true);

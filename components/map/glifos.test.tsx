@@ -22,33 +22,30 @@ describe("pines por vigencia (forma + color)", () => {
     ]);
   });
 
-  it("por vencer: anillo naranja grueso y punto central naranja", () => {
-    const [anillo, punto, ...resto] = capasPin("por-vencer", true);
-    expect(resto).toHaveLength(0);
-    expect(anillo).toEqual(expect.objectContaining({ forma: "circulo", borde: COLOR.aging, relleno: COLOR.white }));
-    expect(anillo.grosor).toBeGreaterThan(capasPin("reciente", true)[0].grosor);
-    expect(punto).toEqual(expect.objectContaining({ forma: "circulo", relleno: COLOR.aging, sinBorde: true }));
-    expect(punto.radio).toBeLessThan(anillo.radio - anillo.grosor / 2);
-  });
-
-  it("vencido: rombo relleno negro con borde blanco", () => {
+  it("vencido: rombo relleno verde oscuro con borde blanco", () => {
     expect(capasPin("vencido", true)).toEqual([
       expect.objectContaining({ forma: "rombo", relleno: COLOR.stale, borde: COLOR.white }),
     ]);
-    expect(COLOR.stale).toBe("#000000");
+    expect(COLOR.stale).toBe("#064e2b");
   });
 
-  it("sin sincronizar: borde discontinuo en todas las formas (no en el punto central)", () => {
+  it("los dos verdes se distinguen también por la forma: anillo (reciente) y rombo (vencido)", () => {
+    expect(capasPin("reciente", true)[0].forma).toBe("circulo");
+    expect(capasPin("vencido", true)[0].forma).toBe("rombo");
+    expect(COLOR.stale).not.toBe(COLOR.done);
+  });
+
+  it("sin sincronizar: borde discontinuo en todas las formas", () => {
     for (const v of VIGENCIAS) {
-      const [principal, punto] = capasPin(v, false);
-      expect(principal.discontinuo).toBeTruthy();
-      if (punto) expect(punto.discontinuo).toBeUndefined();
+      const capas = capasPin(v, false);
+      expect(capas).toHaveLength(1);
+      expect(capas[0].discontinuo).toBeTruthy();
     }
   });
 
   it("dibuja lo más urgente encima: pendientes arriba, atendidos recientes abajo", () => {
     const orden = [...VIGENCIAS].sort((a, b) => ORDEN_DIBUJO[a] - ORDEN_DIBUJO[b]);
-    expect(orden).toEqual(["reciente", "por-vencer", "vencido", "pendiente"]);
+    expect(orden).toEqual(["reciente", "vencido", "pendiente"]);
   });
 
   it("traza el rombo con sus cuatro vértices alrededor del centro", () => {
@@ -59,26 +56,25 @@ describe("pines por vigencia (forma + color)", () => {
 
 describe("GlifoVigencia", () => {
   it("marca la vigencia y es decorativo", () => {
-    render(<GlifoVigencia vigencia="por-vencer" tamano="sm" />);
-    const g = screen.getByTestId("glifo-por-vencer");
-    expect(g).toHaveAttribute("data-vigencia", "por-vencer");
+    render(<GlifoVigencia vigencia="vencido" tamano="sm" />);
+    const g = screen.getByTestId("glifo-vencido");
+    expect(g).toHaveAttribute("data-vigencia", "vencido");
     expect(g).toHaveAttribute("data-tamano", "sm");
     expect(g).toHaveAttribute("aria-hidden", "true");
   });
 });
 
 describe("VigenciaChips", () => {
-  const conteo = { pendiente: 6, reciente: 49, "por-vencer": 3, vencido: 2 };
+  const conteo = { pendiente: 6, reciente: 49, vencido: 2 };
 
-  it("muestra los cuatro chips con su glifo y su conteo", () => {
+  it("muestra los tres chips con su glifo y su conteo", () => {
     render(<VigenciaChips filtros={FILTROS_VACIOS} conteo={conteo} onChange={vi.fn()} />);
     const grupo = screen.getByRole("group", { name: "Filtrar por vigencia de la atención" });
     const chips = within(grupo).getAllByRole("button");
     expect(chips.map((c) => c.textContent)).toEqual([
       "Pendientes6",
-      "Atendidos: Atendido hace 3 días o menos49",
-      "4+ días: Atendido hace 4 a 6 días3",
-      "7+ días: Atendido hace 7 días o más: necesita nueva visita2",
+      "Atendidos: Atendido hace 14 días o menos49",
+      "15+ días: Atendido hace 15 días o más: necesita nueva visita2",
     ]);
     for (const v of VIGENCIAS) expect(within(grupo).getByTestId(`glifo-${v}`)).toBeInTheDocument();
     for (const c of chips) expect(c).toHaveAttribute("aria-pressed", "false");
@@ -90,7 +86,7 @@ describe("VigenciaChips", () => {
       <VigenciaChips filtros={{ ...FILTROS_VACIOS, vigencia: ["pendiente"] }} conteo={conteo} onChange={onChange} />,
     );
     expect(screen.getByRole("button", { name: /^Pendientes/ })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: /^7\+ días/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^15\+ días/ }));
     expect(onChange).toHaveBeenCalledWith({ ...FILTROS_VACIOS, vigencia: ["pendiente", "vencido"] });
   });
 
@@ -100,6 +96,6 @@ describe("VigenciaChips", () => {
     );
     const botones = screen.getAllByRole("button");
     expect(botones[0]).toHaveTextContent("Filtros");
-    expect(botones).toHaveLength(5);
+    expect(botones).toHaveLength(4);
   });
 });
