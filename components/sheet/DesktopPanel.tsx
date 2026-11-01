@@ -13,7 +13,10 @@ import "./sheet.css";
 
 export interface DesktopPanelProps {
   titulo: string;
-  /** Filtros (chips de estado y panel "Filtros"). */
+  /**
+   * Chips de vigencia y botón "Filtros". Solo lo que cabe en la cabecera: el
+   * panel "Filtros" va en el cuerpo (`children`), que es el que tiene scroll.
+   */
   filtros: ReactNode;
   vistaKey: string;
   /** El contenido gestiona su propio scroll, márgenes y barra al pie (el formulario). */
