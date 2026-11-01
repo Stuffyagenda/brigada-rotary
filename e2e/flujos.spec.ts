@@ -59,7 +59,18 @@ async function iniciarSesion(page: Page, cuenta: { email?: string; password?: st
 async function esperarMapa(page: Page) {
   await page.waitForURL((url) => url.pathname === "/");
   await expect(page.getByRole("button", { name: /^Cuenta:/ })).toBeVisible();
+  // En un celular nuevo se abren una vez las novedades de la versión: se cierran.
+  const novedades = page.getByRole("dialog", { name: /^Novedades de la versión/ });
+  if (await novedades.isVisible().catch(() => false)) {
+    await novedades.getByRole("button", { name: "Entendido" }).click();
+    await expect(novedades).toBeHidden();
+  }
   await expect(page.getByRole("button", { name: "Registrar familia" })).toBeVisible();
+}
+
+/** Hoy en Panamá (`YYYY-MM-DD`), para la fecha del reporte (empieza vacía). */
+function hoyPanama(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(new Date());
 }
 
 async function cerrarSesion(page: Page) {
@@ -74,6 +85,7 @@ async function registrarFamilia(page: Page, nombre: string): Promise<string> {
   await page.getByRole("button", { name: "Registrar familia" }).click();
   const formulario = page.getByRole("form", { name: "Registrar familia" });
   await expect(formulario).toBeVisible();
+  await formulario.getByLabel("Fecha del reporte").fill(hoyPanama());
   await formulario.getByLabel("Nombre del jefe o jefa de hogar").fill(nombre);
   await formulario.getByRole("button", { name: "Guardar reporte" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Guardar" }).click();
@@ -159,6 +171,33 @@ test.describe("sin borrado de reportes", () => {
     await page.goto(`/?reporte=${id}`);
     await expect(page.getByRole("dialog", { name: "Ficha de la familia" })).toBeVisible();
     await expect(accionBorrar(page)).toHaveCount(0);
+  });
+});
+
+test.describe("filtros en escritorio con poca altura", () => {
+  // Laptop baja (o con zoom): el panel "Filtros" no puede quedar fuera de la pantalla.
+  test.use({ viewport: { width: 1280, height: 700 }, isMobile: false, hasTouch: false });
+
+  test.beforeEach(() => {
+    test.skip(!hayCredenciales, MOTIVO_CREDENCIALES);
+  });
+
+  test("el panel Filtros hace scroll hasta «Listo» y la cabecera cabe en la pantalla", async ({ page }) => {
+    await iniciarSesion(page, MIEMBRO);
+    await esperarMapa(page);
+    await page.getByRole("button", { name: "Filtros", exact: true }).click();
+
+    const columna = page.getByRole("complementary", { name: "Filtros" });
+    await expect(columna.getByRole("heading", { name: "Filtros" })).toBeVisible();
+    const cabecera = await columna.locator("header").boundingBox();
+    expect(cabecera!.y + cabecera!.height).toBeLessThan(700 / 2);
+
+    const listo = columna.getByRole("button", { name: "Listo" });
+    await listo.scrollIntoViewIfNeeded();
+    await expect(listo).toBeInViewport();
+    await listo.click();
+    await expect(columna).toHaveCount(0);
+    await expect(page.getByRole("complementary", { name: "Resumen de la zona" })).toBeVisible();
   });
 });
 
