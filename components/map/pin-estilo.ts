@@ -4,8 +4,7 @@
  *
  * - pendiente: círculo relleno rojo con borde blanco
  * - reciente: anillo verde con relleno blanco
- * - por-vencer: anillo naranja grueso con punto central naranja
- * - vencido: rombo relleno negro con borde blanco
+ * - vencido: rombo relleno verde oscuro con borde blanco
  *
  * Sin sincronizar: el borde va discontinuo.
  */
@@ -52,18 +51,6 @@ export function capasPin(v: Vigencia, sincronizado: boolean): CapaPin[] {
           discontinuo: sincronizado ? undefined : "4 2.5",
         },
       ];
-    case "por-vencer":
-      return [
-        {
-          forma: "circulo",
-          radio: 8.5,
-          borde: COLOR.aging,
-          grosor: 5,
-          relleno: COLOR.white,
-          discontinuo: sincronizado ? undefined : "4 2.5",
-        },
-        { forma: "circulo", radio: 3, borde: COLOR.aging, grosor: 0, relleno: COLOR.aging, sinBorde: true },
-      ];
     case "vencido":
       return [
         {
@@ -79,12 +66,11 @@ export function capasPin(v: Vigencia, sincronizado: boolean): CapaPin[] {
 }
 
 /**
- * Orden de dibujo: lo más urgente encima. Atendidos recientes abajo, luego por
- * vencer, vencidos y, arriba de todo, los pendientes.
+ * Orden de dibujo: lo más urgente encima. Atendidos recientes abajo, luego
+ * vencidos y, arriba de todo, los pendientes.
  */
 export const ORDEN_DIBUJO: Record<Vigencia, number> = {
   reciente: 0,
-  "por-vencer": 1,
-  vencido: 2,
-  pendiente: 3,
+  vencido: 1,
+  pendiente: 2,
 };

@@ -8,9 +8,11 @@
  *
  * Vigencia de un reporte (desde la última atención, `attended_at`):
  * - `pendiente`: estado PENDIENTE.
- * - `reciente`: ATENDIDO hace 0 a 3 días.
- * - `por-vencer`: ATENDIDO hace 4 a 6 días (naranja, `--color-aging`).
- * - `vencido`: ATENDIDO hace 7 días o más (negro, `--color-stale`): necesita nueva visita.
+ * - `reciente`: ATENDIDO hace 0 a 14 días.
+ * - `vencido`: ATENDIDO hace 15 días o más (verde oscuro, `--color-stale`): necesita nueva visita.
+ *
+ * `attended_at` sale de la fecha que elige el brigadista (fecha del reporte, de
+ * la atención o de la visita), no de la hora en que se guardó.
  *
  * Este módulo no importa valores de `lib/types.ts` (solo tipos), así que
  * `lib/types.ts` puede usarlo sin dependencias circulares.
@@ -27,10 +29,8 @@ export const ZONA_PANAMA = "America/Panama";
 const DESFASE_PANAMA_MS = -5 * 60 * 60 * 1000;
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-/** Días desde la atención a partir de los cuales el reporte está "por vencer". */
-export const DIAS_POR_VENCER = 4;
 /** Días desde la atención a partir de los cuales el reporte está "vencido". */
-export const DIAS_VENCIDO = 7;
+export const DIAS_VENCIDO = 15;
 
 let formateador: Intl.DateTimeFormat | null = null;
 
@@ -108,7 +108,7 @@ export function diasDesdeAtencion(
 
 /**
  * Vigencia de la atención de un reporte.
- * PENDIENTE → `pendiente`; ATENDIDO: 0–3 días `reciente`, 4–6 `por-vencer`, ≥ 7 `vencido`.
+ * PENDIENTE → `pendiente`; ATENDIDO: 0–14 días `reciente`, ≥ 15 `vencido`.
  * Un ATENDIDO sin `attended_at` válido (no debería ocurrir: lo impide el check
  * del SQL) cuenta como `vencido`, para que no pase por atendido recientemente.
  */
@@ -116,27 +116,24 @@ export function vigencia(r: Pick<Reporte, "estado" | "attended_at">, ahora: Date
   if (r.estado !== "ATENDIDO") return "pendiente";
   const dias = diasDesdeAtencion(r, ahora);
   if (dias === null || dias >= DIAS_VENCIDO) return "vencido";
-  if (dias >= DIAS_POR_VENCER) return "por-vencer";
   return "reciente";
 }
 
 /** Vigencias en orden de presentación (chips de filtro, leyenda). */
-export const VIGENCIAS = ["pendiente", "reciente", "por-vencer", "vencido"] as const satisfies readonly Vigencia[];
+export const VIGENCIAS = ["pendiente", "reciente", "vencido"] as const satisfies readonly Vigencia[];
 
 /** Etiqueta corta de cada vigencia (chips de filtro: "Pendientes 12"). */
 export const VIGENCIA_LABEL: Record<Vigencia, string> = {
   pendiente: "Pendientes",
   reciente: "Atendidos",
-  "por-vencer": "4+ días",
-  vencido: "7+ días",
+  vencido: "15+ días",
 };
 
 /** Descripción completa de cada vigencia (leyenda, lectores de pantalla). */
 export const VIGENCIA_DESCRIPCION: Record<Vigencia, string> = {
   pendiente: "Pendiente de atención",
-  reciente: "Atendido hace 3 días o menos",
-  "por-vencer": "Atendido hace 4 a 6 días",
-  vencido: "Atendido hace 7 días o más: necesita nueva visita",
+  reciente: "Atendido hace 14 días o menos",
+  vencido: "Atendido hace 15 días o más: necesita nueva visita",
 };
 
 /** "Atendido hoy", "Atendido ayer" o "Atendido hace N días". */

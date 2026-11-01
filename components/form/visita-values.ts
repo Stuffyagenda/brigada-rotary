@@ -14,7 +14,10 @@ export type VisitaValues = Record<EntregaColumna, boolean> & {
   observaciones: string;
 };
 
-/** Valores iniciales: fecha de hoy (Panamá), sin entregas ni observaciones. */
+/**
+ * Valores iniciales: sin fecha (el brigadista debe elegir el día de la visita),
+ * sin entregas ni observaciones.
+ */
 export function valoresInicialesVisita(brigadista?: string | null, ahora?: Date): VisitaValues {
   const v = visitaVacia("", { brigadista, ahora });
   const entregas = Object.fromEntries(INSUMOS.map((i) => [i.entColumna, v[i.entColumna]])) as Record<
@@ -23,7 +26,7 @@ export function valoresInicialesVisita(brigadista?: string | null, ahora?: Date)
   >;
   return {
     ...entregas,
-    fecha: v.fecha,
+    fecha: "",
     brigadista_texto: v.brigadista_texto ?? "",
     ent_otros: [],
     observaciones: "",
@@ -67,6 +70,7 @@ const extrasSchema = z.object({
  */
 export function validarVisita(input: VisitaInput): Record<string, string> {
   const errores: Record<string, string> = {};
+  if (input.fecha === "") errores.fecha = "Elige la fecha de la visita.";
   const add = (issues: z.ZodError["issues"]) => {
     for (const issue of issues) {
       const campo = String(issue.path[0] ?? "formulario");
